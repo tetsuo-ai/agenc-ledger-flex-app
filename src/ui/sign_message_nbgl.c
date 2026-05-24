@@ -217,6 +217,12 @@ static void start_message_signing_review(void) {
                 confirmation_text = "Accept risk and sign transaction";
 #endif
                 break;
+            case TRANSACTION_TYPE_AGENC_ACTION:
+                review_title = "Review AgenC action";
+#ifdef SCREEN_SIZE_WALLET
+                confirmation_text = "Sign AgenC action?";
+#endif
+                break;
             case TRANSACTION_TYPE_OTHER:
             default:
                 review_title = "Review transaction";

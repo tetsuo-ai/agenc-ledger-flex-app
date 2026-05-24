@@ -132,8 +132,10 @@ void test_process_message_body_ix_with_unknown_program_id_fail() {
 }
 
 static void process_message_body_and_sanity_check(const uint8_t* message, size_t message_length, size_t expected_fields) {
-    PrintConfig print_config;
+    PrintConfig print_config = {0};
     print_config.expert_mode = true;
+    // These fixtures assert full-print summary counts; keep the config deterministic.
+    print_config.force_full_print = true;
     Parser parser = { message, message_length };
     assert(parse_message_header(&parser, &print_config.header) == 0);
     transaction_summary_reset();
@@ -143,6 +145,15 @@ static void process_message_body_and_sanity_check(const uint8_t* message, size_t
     enum SummaryItemKind kinds[MAX_TRANSACTION_SUMMARY_ITEMS];
     size_t num_kinds;
     assert(transaction_summary_finalize(kinds, &num_kinds) == 0);
+    if (num_kinds != expected_fields) {
+        printf("Expected %zu summary fields, got %zu\n", expected_fields, num_kinds);
+        for (size_t i = 0; i < num_kinds; i++) {
+            if (transaction_summary_display_item(i, DisplayFlagNone) == 0) {
+                printf("  [%zu] %s = %s\n", i, G_transaction_summary_title, G_transaction_summary_text);
+            }
+        }
+        fflush(stdout);
+    }
     assert(num_kinds == expected_fields);
     for (size_t i = 0; i < num_kinds; i++) {
         assert(transaction_summary_display_item(i, DisplayFlagNone) == 0);
@@ -215,7 +226,7 @@ void test_process_message_body_transfer_with_request_units(){
         0, 0, 0, 0, 0, 0, 0
     };
 
-    PrintConfig print_config;
+    PrintConfig print_config = {0};
     Parser parser = { message, sizeof(message) };
     assert(parse_message_header(&parser, &print_config.header) == 0);
 
@@ -1929,7 +1940,7 @@ void test_process_message_body_spl_associated_token_recover_nested_fail() {
             0x01,
                 0x02,
     };
-    PrintConfig print_config;
+    PrintConfig print_config = {0};
     Parser parser = { message, sizeof(message) };
     assert(parse_message_header(&parser, &print_config.header) == 0);
     transaction_summary_reset();
@@ -1955,7 +1966,7 @@ void test_process_message_body_spl_associated_token_trailing_data_fail() {
             0x02,
                 0x00, 0x00,
     };
-    PrintConfig print_config;
+    PrintConfig print_config = {0};
     Parser parser = { message, sizeof(message) };
     assert(parse_message_header(&parser, &print_config.header) == 0);
     transaction_summary_reset();

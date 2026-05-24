@@ -5,6 +5,7 @@
 #include "spl_token_instruction.h"
 #include "spl_token2022_instruction.h"
 #include "compute_budget_instruction.h"
+#include "agenc_instruction.h"
 #include "stake_instruction.h"
 #include "system_instruction.h"
 #include "util.h"
@@ -40,6 +41,9 @@ enum ProgramId instruction_program_id(const Instruction *instruction, const Mess
     } else if (memcmp(program_id, &compute_budget_program_id, PUBKEY_SIZE) == 0) {
         PRINTF("ProgramIdComputeBudget\n");
         return ProgramIdComputeBudget;
+    } else if (is_agenc_program_id(program_id)) {
+        PRINTF("ProgramIdAgenc\n");
+        return ProgramIdAgenc;
     }
 
     PRINTF("ProgramIdUnknown\n");
@@ -65,6 +69,8 @@ bool instruction_info_matches_brief(const InstructionInfo *info, const Instructi
                 return true;
             case ProgramIdComputeBudget:
                 return (brief->compute_budget == info->compute_budget.kind);
+            case ProgramIdAgenc:
+                return (brief->agenc == info->agenc.kind);
             case ProgramIdSplToken:
                 return (brief->spl_token == info->spl_token.kind);
             case ProgramIdStake:

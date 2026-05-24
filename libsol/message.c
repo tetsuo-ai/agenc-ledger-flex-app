@@ -11,6 +11,7 @@
 #include "transaction_printers.h"
 #include "util.h"
 #include "compute_budget_instruction.h"
+#include "agenc_instruction.h"
 #include <string.h>
 
 #include "handle_provide_instruction_descriptor.h"
@@ -145,6 +146,13 @@ int process_message_body(const uint8_t *message_body,
                 }
                 break;
             }
+            case ProgramIdAgenc: {
+                PRINTF("Instruction uses program ProgramIdAgenc\n");
+                if (parse_agenc_instructions(&instruction, header, &info->agenc) == 0) {
+                    info->kind = program_id;
+                }
+                break;
+            }
             case ProgramIdUnknown:
                 PRINTF("Instruction uses program ProgramIdUnknown\n");
                 break;
@@ -159,6 +167,7 @@ int process_message_body(const uint8_t *message_body,
                 case ProgramIdStake:
                 case ProgramIdVote:
                 case ProgramIdComputeBudget:
+                case ProgramIdAgenc:
                 case ProgramIdUnknown:
                     if (display_instruction_count >= MAX_INSTRUCTIONS) {
                         PRINTF("Error: too many instructions to display requested\n");

@@ -3,6 +3,7 @@
 #include "sol/parser.h"
 #include "sol/print_config.h"
 #include "sol/transaction_summary.h"
+#include "agenc_instruction.h"
 #include "stake_instruction.h"
 #include "spl_token2022_instruction.h"
 #include "transaction_printers.h"
@@ -209,6 +210,13 @@ const InstructionBrief spl_associated_token_account_create_with_transfer_fee_bri
     instruction_infos_match_briefs(infos,                                                       \
                                    spl_associated_token_account_create_with_transfer_fee_brief, \
                                    infos_length)
+
+const InstructionBrief agenc_create_task_with_review_brief[] = {
+    AGENC_IX_BRIEF(AgencInstructionCreateTask),
+    AGENC_IX_BRIEF(AgencInstructionConfigureTaskValidation),
+};
+#define is_agenc_create_task_with_review(infos, infos_length) \
+    instruction_infos_match_briefs(infos, agenc_create_task_with_review_brief, infos_length)
 
 static int print_create_stake_account(const PrintConfig *print_config,
                                       InstructionInfo *const *infos,
@@ -682,6 +690,10 @@ static int print_transaction_nonce_processed(const PrintConfig *print_config,
                         &(infos[0]->spl_associated_token_account),
                         print_config);
                     break;
+                case ProgramIdAgenc:
+                    PRINTF("Handle with print_agenc_info\n");
+                    print_ret = print_agenc_info(&(infos[0]->agenc), print_config);
+                    break;
                 case ProgramIdSerumAssertOwner:
                 case ProgramIdSplMemo:
                 case ProgramIdComputeBudget:
@@ -754,6 +766,11 @@ static int print_transaction_nonce_processed(const PrintConfig *print_config,
                 print_ret = print_spl_associated_token_account_create_with_transfer(print_config,
                                                                                     infos,
                                                                                     infos_length);
+            } else if (is_agenc_create_task_with_review(infos, infos_length)) {
+                PRINTF("Handle with print_agenc_create_task_with_review_info\n");
+                print_ret = print_agenc_create_task_with_review_info(&(infos[0]->agenc),
+                                                                     &(infos[1]->agenc),
+                                                                     print_config);
             } else {
                 PRINTF("Unrecognized info pattern\n");
                 return -1;

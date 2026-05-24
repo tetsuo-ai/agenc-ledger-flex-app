@@ -7,6 +7,7 @@
 #include "system_instruction.h"
 #include "vote_instruction.h"
 #include "compute_budget_instruction.h"
+#include "agenc_instruction.h"
 #include <stdbool.h>
 
 enum ProgramId {
@@ -18,7 +19,8 @@ enum ProgramId {
     ProgramIdSplAssociatedTokenAccount,
     ProgramIdSplMemo,
     ProgramIdSerumAssertOwner,
-    ProgramIdComputeBudget
+    ProgramIdComputeBudget,
+    ProgramIdAgenc
 };
 
 typedef struct InstructionInfo {
@@ -30,6 +32,7 @@ typedef struct InstructionInfo {
         SystemInfo system;
         VoteInfo vote;
         ComputeBudgetInfo compute_budget;
+        AgencInfo agenc;
     };
 } InstructionInfo;
 
@@ -45,6 +48,7 @@ typedef struct InstructionBrief {
         enum StakeInstructionKind stake;
         enum VoteInstructionKind vote;
         enum ComputeBudgetInstructionKind compute_budget;
+        AgencInstructionKind agenc;
     };
 } InstructionBrief;
 
@@ -58,6 +62,8 @@ typedef struct InstructionBrief {
     { ProgramIdStake, .stake = (stake_ix) }
 #define VOTE_IX_BRIEF(vote_ix) \
     { ProgramIdVote, .vote = (vote_ix) }
+#define AGENC_IX_BRIEF(agenc_ix) \
+    { ProgramIdAgenc, .agenc = (agenc_ix) }
 
 bool instruction_info_matches_brief(const InstructionInfo *info, const InstructionBrief *brief);
 bool instruction_infos_match_briefs(InstructionInfo *const *infos,

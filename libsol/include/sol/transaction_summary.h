@@ -84,6 +84,7 @@ typedef enum transaction_type_e {
     TRANSACTION_TYPE_SOL_ACTIVATE_STAKE,
     TRANSACTION_TYPE_SOL_WITHDRAW,
     TRANSACTION_TYPE_BLIND_SIGNING,
+    TRANSACTION_TYPE_AGENC_ACTION,
 } transaction_type_t;
 
 // Get a pointer to the requested SummaryItem. NULL if it has already been set

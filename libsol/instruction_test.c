@@ -24,6 +24,20 @@ void test_instruction_program_id_compute_budget() {
     }
 }
 
+void test_instruction_program_id_agenc() {
+    Pubkey program_id;
+    memcpy(&program_id, &agenc_artifact_program_id, PUBKEY_SIZE);
+    Instruction instruction = {0, NULL, 0, NULL, 0};
+    {
+        MessageHeader header = {false, 0, {0, 0, 0, 1}, &program_id, NULL, 1};
+        assert(instruction_program_id(&instruction, &header) == ProgramIdAgenc);
+    }
+    {
+        MessageHeader header = {true, 0, {0, 0, 0, 1}, &program_id, NULL, 1};
+        assert(instruction_program_id(&instruction, &header) == ProgramIdAgenc);
+    }
+}
+
 void test_instruction_program_id_spl_memo() {
     Pubkey program_id;
     memcpy(&program_id, &spl_memo_program_id, PUBKEY_SIZE);
@@ -138,6 +152,9 @@ void test_static_brief_initializer_macros() {
     InstructionBrief stake_test = STAKE_IX_BRIEF(StakeDelegate);
     InstructionBrief stake_expect = {ProgramIdStake, .stake = StakeDelegate};
     assert(memcmp(&stake_test, &stake_expect, sizeof(InstructionBrief)) == 0);
+    InstructionBrief agenc_test = AGENC_IX_BRIEF(AgencInstructionClaimTaskWithJobSpec);
+    InstructionBrief agenc_expect = {ProgramIdAgenc, .agenc = AgencInstructionClaimTaskWithJobSpec};
+    assert(memcmp(&agenc_test, &agenc_expect, sizeof(InstructionBrief)) == 0);
 }
 
 void test_instruction_info_matches_brief_constants() {
@@ -174,6 +191,23 @@ void test_instruction_compute_budget_matches_brief() {
     {
         InstructionBrief brief_fail = {.program_id = ProgramIdComputeBudget,
                                        .compute_budget = ComputeBudgetRequestHeapFrame};
+        assert(!instruction_info_matches_brief(&info, &brief_fail));
+    }
+}
+
+void test_instruction_agenc_matches_brief() {
+    InstructionInfo info = {.kind = ProgramIdAgenc,
+                            .agenc = {.kind = AgencInstructionSubmitTaskResult}};
+
+    {
+        InstructionBrief brief_pass = {.program_id = ProgramIdAgenc,
+                                       .agenc = AgencInstructionSubmitTaskResult};
+        assert(instruction_info_matches_brief(&info, &brief_pass));
+    }
+
+    {
+        InstructionBrief brief_fail = {.program_id = ProgramIdAgenc,
+                                       .agenc = AgencInstructionRejectTaskResult};
         assert(!instruction_info_matches_brief(&info, &brief_fail));
     }
 }
@@ -288,8 +322,10 @@ int main() {
     test_instruction_accounts_iterator_next();
     test_instruction_program_id_spl_memo();
     test_instruction_program_id_compute_budget();
+    test_instruction_program_id_agenc();
     test_instruction_info_matches_brief_constants();
     test_instruction_compute_budget_matches_brief();
+    test_instruction_agenc_matches_brief();
 
     printf("passed\n");
     return 0;

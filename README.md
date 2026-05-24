@@ -2,6 +2,13 @@
 
 # Solana app for Ledger Wallet
 
+## AgenC fork note
+
+This checkout contains a local AgenC clear-signing fork. Hardware testing must
+not replace the official installed Ledger `Solana` app. Build and load the
+AgenC variant side-by-side as `AgenC Solana`; see
+`doc/agenc-ledger-flex.md`.
+
 ## Overview
 
 This app adds support for the Solana native token to Ledger Nano S hardware wallet.
@@ -43,7 +50,7 @@ bash$ BOLOS_SDK=$NANOS_SDK make clean
 
 ## Working with the device
 
-See [Ledger Application Builder](https://github.com/LedgerHQ/ledger-app-builder?tab=readme-ov-file#compile-your-app-in-the-container) for more details. 
+See [Ledger Application Builder](https://github.com/LedgerHQ/ledger-app-builder?tab=readme-ov-file#compile-your-app-in-the-container) for more details.
 
 ### Load
 
