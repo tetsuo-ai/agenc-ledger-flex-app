@@ -1,102 +1,217 @@
-[![Build Status](https://travis-ci.org/solana-labs/ledger-app-solana.svg?branch=master)](https://travis-ci.org/solana-labs/ledger-app-solana)
+# AgenC Ledger Flex App
 
-# Solana app for Ledger Wallet
+Private firmware workspace for an AgenC-aware Ledger Flex signing app.
 
-## AgenC fork note
+This repository is based on Ledger's upstream
+[`app-solana`](https://github.com/LedgerHQ/app-solana) codebase. It keeps the
+Solana transaction parsing, signing, derivation, and APDU foundations, then adds
+native AgenC instruction parsing so supported AgenC actions can be reviewed on
+the Ledger secure screen.
 
-This checkout contains a local AgenC clear-signing fork. Hardware testing must
-not replace the official installed Ledger `Solana` app. Build and load the
-AgenC variant side-by-side as `AgenC Solana`; see
-`doc/agenc-ledger-flex.md`.
+## Status
 
-## Overview
+Current milestone:
 
-This app adds support for the Solana native token to Ledger Nano S hardware wallet.
+- AgenC parser/display scaffold is implemented in `libsol`
+- Flex Ragger/Speculos snapshots exist for supported v1 AgenC review flows
+- a side-by-side app named `AgenC Solana` has been built and installed on a real
+  Ledger Flex
+- the official Ledger `Solana` app remains installed separately
 
-Current Features:
-- Pubkey queries
-- Parse, display and sign all Solana CLI generated transaction formats
-- Blind sign arbitrary transactions (Enabled via settings)
+Current Flex build hash:
 
-## Prerequisites
-
-### For building the app
-
-* [Install Docker](https://docs.docker.com/get-docker/)
-* For Linux hosts, install the Ledger Nano [udev rules](https://github.com/LedgerHQ/udev-rules)
-* Pull Ledger Development Tools image
-
-```sh
-$ docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
+```text
+644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
 ```
+
+This is an engineering fork, not a production Ledger Live release.
+
+## Safety Rule
+
+Do not replace the official installed Ledger `Solana` app.
+
+For hardware testing, this fork is packaged as a separate Ledger app:
+
+```text
+AgenC Solana
+```
+
+Do not use upstream `make load` for this fork. The upstream default targets app
+name `Solana` with `--delete`. Use the guarded scripts under `tools/agenc/`
+instead.
+
+## Clear-Signing Scope
+
+The v1 parser focuses on the AgenC marketplace actions that matter for a first
+secure-screen workflow:
+
+- create task with review configuration
+- attach job spec
+- claim task
+- submit result
+- accept result
+- reject result
+- cancel task
+
+The device derives display fields from signed Solana transaction bytes:
+
+- program id
+- Anchor discriminator
+- instruction data
+- account indexes and account keys
+
+The device does not trust host-provided display strings for security-critical
+review text.
+
+Some fields are intentionally shown as incomplete when they are not present in
+the transaction bytes. For example, the current scaffold does not infer
+settlement reward or cancellation refund amounts from account state.
+
+## Repository Layout
+
+- `libsol/agenc_instruction.*`
+  Native AgenC instruction parser and display model.
+- `libsol/agenc_instruction_test.c`
+  Direct parser tests and serialized Solana message fixtures.
+- `tests/application_client/agenc_cmd_builder.py`
+  Python fixture builder for AgenC transactions.
+- `tests/python/test_agenc_clear_signing.py`
+  Ragger/Speculos coverage for Flex secure-screen flows.
+- `tests/python/snapshots/flex/test_agenc_*`
+  Golden Flex screenshots for supported AgenC actions.
+- `icons/icon_agenc_*` and `glyphs/home_agenc_*`
+  Ledger icon and NBGL home glyph assets generated from the AgenC logo.
+- `tools/agenc/`
+  Safe build, load, APDU, and icon helper scripts for the side-by-side app.
+- `doc/agenc-ledger-flex.md`
+  Hardware loading notes and real-device result log.
 
 ## Build
 
-Build the app in the container. The BOLOS_SDK variable is used to specify the target SDK, allowing to compile the application for each Ledger device. See [Ledger Application Builder](https://github.com/LedgerHQ/ledger-app-builder?tab=readme-ov-file#compile-your-app-in-the-container) for more details.
+Build the side-by-side Flex app:
 
 ```sh
-# E.g. for Nano S
-$ sudo docker run --rm -ti -v "$(realpath .):/app" --user $(id -u $USER):$(id -g $USER) ghcr.io/ledgerhq/ledger-app-builder//ledger-app-dev-tools:latest
-bash$ BOLOS_SDK=$NANOS_SDK make
+tools/agenc/build-flex.sh
 ```
 
-### Clean
+This uses Ledger's dev-tools container and builds with:
 
-Within the running development container
-
-```sh
-bash$ BOLOS_SDK=$NANOS_SDK make clean
+```text
+APPNAME="AgenC Solana"
 ```
 
-## Working with the device
+The output is written to:
 
-See [Ledger Application Builder](https://github.com/LedgerHQ/ledger-app-builder?tab=readme-ov-file#compile-your-app-in-the-container) for more details.
-
-### Load
-
-```bash
-$ sudo docker run --rm -ti  -v "$(realpath .):/app" --privileged -v "/dev/bus/usb:/dev/bus/usb" --user $(id -u $USER):$(id -g $USER) ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
-bash$ BOLOS_SDK=$NANOS_SDK make load
-```
-
-### Delete
-
-Within the running development container
-
-```sh
-bash$ BOLOS_SDK=$NANOS_SDK make delete
-```
+- `bin/app.elf`
+- `bin/app.hex`
+- `bin/app.apdu`
+- `bin/app.sha256`
 
 ## Test
 
-### Unit
-
-Run C tests:
+Run the C parser/message tests:
 
 ```sh
-bash$ make -C libsol
+docker run --rm -v "$PWD:/app" -w /app \
+  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest \
+  make -C libsol clean
+
+docker run --rm -v "$PWD:/app" -w /app \
+  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest \
+  make -C libsol
 ```
 
-### Ragger
-
-Make sure that you have already built the application for the specific device.
-
-Run Ragger tests:
+Run focused Flex Ragger/Speculos tests:
 
 ```sh
-# Install python test suite dependencies
-bash$ pip install -r "tests/python/requirements.txt"
-
-# Run test suite for the specific device, e.g. nanos
-bash$ pytest tests/python/ --tb=short -v --device nanos -k ""
+docker run --rm -v "$PWD:/app" -w /app \
+  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
+  sh -lc 'rm -rf .tmp-ragger && trap "rm -rf .tmp-ragger" EXIT &&
+  mkdir -p .tmp-ragger/tmp .tmp-ragger/cache &&
+  TMPDIR=/app/.tmp-ragger/tmp python3 -m venv --system-site-packages .tmp-ragger/venv &&
+  . .tmp-ragger/venv/bin/activate &&
+  TMPDIR=/app/.tmp-ragger/tmp PIP_CACHE_DIR=/app/.tmp-ragger/cache \
+    python -m pip install --no-cache-dir base58 ecdsa solders solana "ragger[tests]" &&
+  pytest tests/python/test_agenc_clear_signing.py --tb=short -v --device flex'
 ```
 
-To regenerate golden snapshots, use `--golden_run` option.
+## Hardware Loading
 
-### Integration
-
-First enable `blind-signing` in the App settings
+Confirm the Flex is visible:
 
 ```sh
-bash$ cargo run --manifest-path tests/Cargo.toml
+tools/agenc/list-flex-apps.sh
 ```
+
+Generate a side-by-side offline APDU:
+
+```sh
+tools/agenc/generate-load-apdu.sh
+```
+
+Load the app only after confirming the target is `AgenC Solana`:
+
+```sh
+AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1 tools/agenc/load-flex.sh
+```
+
+The load script refuses to run without `AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1`.
+It calculates `dataSize` and `installparamsSize` from `debug/app.map`, matching
+Ledger SDK behavior.
+
+Successful hardware load parameters from the current build:
+
+```text
+appName=AgenC Solana
+dataSize=512
+installparamsSize=345
+app.sha256=644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
+```
+
+Post-load `listApps` confirmed both `Solana` and `AgenC Solana` installed on
+the same Ledger Flex.
+
+## Program ID Policy
+
+The current code recognizes the generated artifact/devnet AgenC program id by
+default:
+
+```text
+2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
+```
+
+The kit's current mainnet preset id is intentionally gated behind
+`AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET` until program id, IDL layout, and
+deployment provenance are tied together.
+
+```text
+HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
+```
+
+Do not enable mainnet clear signing until that mismatch is resolved.
+
+## Relationship To The Kit
+
+This repository owns firmware parsing, display, and Ledger device tests.
+
+The AgenC Marketplace Agent Kit owns transaction construction, policy checks,
+CLI UX, and Ledger transport integration.
+
+The intended boundary is:
+
+- kit builds and policy-checks the Solana transaction
+- Ledger app parses the signed bytes and displays trusted review fields
+- private keys remain on the Ledger device
+
+## Upstream
+
+Upstream base:
+
+```text
+https://github.com/LedgerHQ/app-solana
+```
+
+Local remote convention:
+
+- `origin`: Ledger upstream
+- `agenc`: private AgenC app repo
