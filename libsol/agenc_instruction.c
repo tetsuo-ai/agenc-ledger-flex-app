@@ -45,11 +45,9 @@ bool is_agenc_program_id(const Pubkey *program_id) {
         return true;
     }
 
-#ifdef AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET
     if (pubkeys_equal(program_id, &agenc_mainnet_preset_program_id)) {
         return true;
     }
-#endif
 
     return false;
 }

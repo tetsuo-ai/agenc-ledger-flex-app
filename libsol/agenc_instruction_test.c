@@ -29,7 +29,7 @@ static void init_pubkeys(Pubkey pubkeys[12]) {
     }
     memcpy(&pubkeys[COMPUTE_BUDGET_INDEX], &compute_budget_program_id, PUBKEY_SIZE);
     memcpy(&pubkeys[SYSTEM_INDEX], &system_program_id, PUBKEY_SIZE);
-    memcpy(&pubkeys[AGENC_PROGRAM_INDEX], &agenc_artifact_program_id, PUBKEY_SIZE);
+    memcpy(&pubkeys[AGENC_PROGRAM_INDEX], &agenc_mainnet_preset_program_id, PUBKEY_SIZE);
 }
 
 static MessageHeader test_header(Pubkey pubkeys[12], size_t instruction_count) {
@@ -214,10 +214,7 @@ static void assert_summary_count(size_t expected_count) {
 
 void test_is_agenc_program_id() {
     assert(is_agenc_program_id(&agenc_artifact_program_id));
-
-#ifndef AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET
-    assert(!is_agenc_program_id(&agenc_mainnet_preset_program_id));
-#endif
+    assert(is_agenc_program_id(&agenc_mainnet_preset_program_id));
 
     Pubkey other = {{BYTES32_BS58_8}};
     assert(!is_agenc_program_id(&other));
@@ -302,7 +299,7 @@ void test_process_create_task_with_review_message() {
         memset(pubkeys[i].data, (int) (i + 1), PUBKEY_SIZE);
     }
     memcpy(&pubkeys[MESSAGE_SYSTEM_INDEX], &system_program_id, PUBKEY_SIZE);
-    memcpy(&pubkeys[MESSAGE_PROGRAM_INDEX], &agenc_artifact_program_id, PUBKEY_SIZE);
+    memcpy(&pubkeys[MESSAGE_PROGRAM_INDEX], &agenc_mainnet_preset_program_id, PUBKEY_SIZE);
 
     Hash blockhash = {{BYTES32_BS58_8}};
     uint8_t create_accounts[] = {0, 1, 2, 3, 4, 6, 6, MESSAGE_SYSTEM_INDEX};

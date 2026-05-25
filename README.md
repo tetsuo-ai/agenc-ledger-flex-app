@@ -173,22 +173,21 @@ the same Ledger Flex.
 
 ## Program ID Policy
 
-The current code recognizes the generated artifact/devnet AgenC program id by
-default:
-
-```text
-2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
-```
-
-The kit's current mainnet preset id is intentionally gated behind
-`AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET` until program id, IDL layout, and
-deployment provenance are tied together.
+The current side-by-side `AgenC Solana` app recognizes the kit's mainnet
+program id by default for clear-signing tests:
 
 ```text
 HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
 ```
 
-Do not enable mainnet clear signing until that mismatch is resolved.
+The generated artifact/devnet id remains accepted for parser fixtures only:
+
+```text
+2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
+```
+
+If a mainnet AgenC transaction does not show the `AgenC action` screens on the
+device, reject it.
 
 ## Relationship To The Kit
 

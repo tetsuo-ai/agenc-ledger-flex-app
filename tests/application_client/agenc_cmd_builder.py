@@ -9,7 +9,7 @@ from application_client.solana_cmd_builder import (
 )
 
 
-PROGRAM_ID_AGENC_ARTIFACT = "2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7"
+PROGRAM_ID_AGENC_MAINNET = "HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK"
 
 DISCRIMINATOR_CREATE_TASK = bytes.fromhex("c25006b4e87f30ab")
 DISCRIMINATOR_CONFIGURE_TASK_VALIDATION = bytes.fromhex("0b4f13bc0d20f45a")
@@ -186,7 +186,7 @@ def create_review_message(signer_pubkey: bytes, include_compute_budget: bool = T
         _deterministic_pubkey(7),  # spare account
         _pubkey(PROGRAM_ID_COMPUTE_BUDGET),
         _pubkey(PROGRAM_ID_SYSTEM),
-        _pubkey(PROGRAM_ID_AGENC_ARTIFACT),
+        _pubkey(PROGRAM_ID_AGENC_MAINNET),
     ]
     compute_budget_index = 8
     system_index = 9
@@ -225,7 +225,7 @@ def lone_create_task_message(signer_pubkey: bytes) -> bytes:
         _deterministic_pubkey(4),
         _deterministic_pubkey(5),
         _pubkey(PROGRAM_ID_SYSTEM),
-        _pubkey(PROGRAM_ID_AGENC_ARTIFACT),
+        _pubkey(PROGRAM_ID_AGENC_MAINNET),
     ]
     instructions = [
         _compiled_instruction(7, [1, 2, 3, 4, 5, 0, 0, 6], create_task_data()),
@@ -246,7 +246,7 @@ def _single_agenc_message(
         account_keys.append(_pubkey(PROGRAM_ID_SYSTEM))
     else:
         account_keys += [_deterministic_pubkey(seed) for seed in range(1, agenc_index)]
-    account_keys.append(_pubkey(PROGRAM_ID_AGENC_ARTIFACT))
+    account_keys.append(_pubkey(PROGRAM_ID_AGENC_MAINNET))
 
     instructions = [_compiled_instruction(agenc_index, accounts, data)]
     readonly_unsigned_accounts = 2 if include_system_program else 1

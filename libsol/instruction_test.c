@@ -26,14 +26,19 @@ void test_instruction_program_id_compute_budget() {
 
 void test_instruction_program_id_agenc() {
     Pubkey program_id;
-    memcpy(&program_id, &agenc_artifact_program_id, PUBKEY_SIZE);
     Instruction instruction = {0, NULL, 0, NULL, 0};
+    memcpy(&program_id, &agenc_artifact_program_id, PUBKEY_SIZE);
     {
         MessageHeader header = {false, 0, {0, 0, 0, 1}, &program_id, NULL, 1};
         assert(instruction_program_id(&instruction, &header) == ProgramIdAgenc);
     }
     {
         MessageHeader header = {true, 0, {0, 0, 0, 1}, &program_id, NULL, 1};
+        assert(instruction_program_id(&instruction, &header) == ProgramIdAgenc);
+    }
+    memcpy(&program_id, &agenc_mainnet_preset_program_id, PUBKEY_SIZE);
+    {
+        MessageHeader header = {false, 0, {0, 0, 0, 1}, &program_id, NULL, 1};
         assert(instruction_program_id(&instruction, &header) == ProgramIdAgenc);
     }
 }

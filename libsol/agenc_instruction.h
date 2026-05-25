@@ -7,17 +7,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Current generated artifact / devnet IDL program id:
+// Source artifact / devnet IDL program id:
 // 2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
 #define PROGRAM_ID_AGENC_ARTIFACT \
     25, 198, 253, 92, 56, 39, 5, 41, 36, 30, 224, 19, 19, 87, 58, 95, 151, 67, \
         209, 18, 167, 80, 190, 159, 192, 143, 129, 236, 249, 241, 163, 200
 
-// Current kit mainnet preset program id:
+// Current kit mainnet clear-signing program id:
 // HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
-//
-// This id is intentionally not enabled by default because the bundled IDL
-// artifact does not currently prove that this deployment has the same layout.
 #define PROGRAM_ID_AGENC_MAINNET_PRESET \
     242, 79, 6, 99, 64, 38, 134, 189, 153, 254, 99, 205, 191, 250, 117, 81, 77, \
         182, 210, 40, 135, 198, 34, 170, 239, 78, 246, 219, 237, 68, 245, 232
