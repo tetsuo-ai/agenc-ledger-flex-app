@@ -10,6 +10,7 @@
 #define AGENC_DESCRIPTION_SIZE   64
 #define AGENC_RESULT_DATA_SIZE   64
 
+#define AGENC_REGISTER_AGENT_ACCOUNTS             4
 #define AGENC_CREATE_TASK_ACCOUNTS               8
 #define AGENC_CONFIGURE_TASK_VALIDATION_ACCOUNTS 6
 #define AGENC_SET_TASK_JOB_SPEC_ACCOUNTS         7
@@ -19,10 +20,14 @@
 #define AGENC_REJECT_TASK_RESULT_ACCOUNTS        8
 #define AGENC_CANCEL_TASK_BASE_ACCOUNTS          5
 #define AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE  3
+#define AGENC_EXPIRE_CLAIM_MIN_ACCOUNTS          8
+#define AGENC_EXPIRE_CLAIM_MAX_ACCOUNTS          10
 
 const Pubkey agenc_artifact_program_id = {{PROGRAM_ID_AGENC_ARTIFACT}};
 const Pubkey agenc_mainnet_preset_program_id = {{PROGRAM_ID_AGENC_MAINNET_PRESET}};
 
+static const uint8_t DISCRIMINATOR_REGISTER_AGENT[AGENC_DISCRIMINATOR_SIZE] = {
+    0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e};
 static const uint8_t DISCRIMINATOR_CREATE_TASK[AGENC_DISCRIMINATOR_SIZE] = {
     0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab};
 static const uint8_t DISCRIMINATOR_CONFIGURE_TASK_VALIDATION[AGENC_DISCRIMINATOR_SIZE] = {
@@ -39,6 +44,8 @@ static const uint8_t DISCRIMINATOR_REJECT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] 
     0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6};
 static const uint8_t DISCRIMINATOR_CANCEL_TASK[AGENC_DISCRIMINATOR_SIZE] = {
     0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
+static const uint8_t DISCRIMINATOR_EXPIRE_CLAIM[AGENC_DISCRIMINATOR_SIZE] = {
+    0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
 
 bool is_agenc_program_id(const Pubkey *program_id) {
     if (pubkeys_equal(program_id, &agenc_artifact_program_id)) {
@@ -121,6 +128,20 @@ static int parse_borsh_string(Parser *parser, SizedString *string) {
     return 0;
 }
 
+static int parse_optional_borsh_string(Parser *parser,
+                                       SizedString *string,
+                                       bool *has_string) {
+    enum Option option;
+    BAIL_IF(parse_option(parser, &option));
+    if (option == OptionNone) {
+        explicit_bzero(string, sizeof(*string));
+        *has_string = false;
+        return 0;
+    }
+    *has_string = true;
+    return parse_borsh_string(parser, string);
+}
+
 static int account_at(const Instruction *instruction,
                       const MessageHeader *header,
                       uint8_t account_index,
@@ -134,6 +155,25 @@ static int account_at(const Instruction *instruction,
 
 static int validate_system_program(const Pubkey *pubkey) {
     BAIL_IF(!pubkeys_equal(pubkey, &system_program_id));
+    return 0;
+}
+
+static int parse_register_agent(Parser *parser,
+                                const Instruction *instruction,
+                                const MessageHeader *header,
+                                AgencRegisterAgentInfo *info) {
+    BAIL_IF(instruction->accounts_length != AGENC_REGISTER_AGENT_ACCOUNTS);
+    BAIL_IF(account_at(instruction, header, 0, &info->agent));
+    BAIL_IF(account_at(instruction, header, 1, &info->protocol_config));
+    BAIL_IF(account_at(instruction, header, 2, &info->authority));
+    BAIL_IF(account_at(instruction, header, 3, &info->system_program));
+    BAIL_IF(validate_system_program(info->system_program));
+
+    BAIL_IF(parse_hash_ref(parser, &info->agent_id));
+    BAIL_IF(parse_u64(parser, &info->capabilities));
+    BAIL_IF(parse_borsh_string(parser, &info->endpoint));
+    BAIL_IF(parse_optional_borsh_string(parser, &info->metadata_uri, &info->has_metadata_uri));
+    BAIL_IF(parse_u64(parser, &info->stake_amount));
     return 0;
 }
 
@@ -294,6 +334,34 @@ static int parse_cancel_task(const Instruction *instruction,
     return 0;
 }
 
+static int parse_expire_claim(const Instruction *instruction,
+                              const MessageHeader *header,
+                              AgencExpireClaimInfo *info) {
+    BAIL_IF(instruction->accounts_length < AGENC_EXPIRE_CLAIM_MIN_ACCOUNTS);
+    BAIL_IF(instruction->accounts_length > AGENC_EXPIRE_CLAIM_MAX_ACCOUNTS);
+    BAIL_IF(account_at(instruction, header, 0, &info->authority));
+    BAIL_IF(account_at(instruction, header, 1, &info->task));
+    BAIL_IF(account_at(instruction, header, 2, &info->escrow));
+    BAIL_IF(account_at(instruction, header, 3, &info->claim));
+    BAIL_IF(account_at(instruction, header, 4, &info->worker));
+    BAIL_IF(account_at(instruction, header, 5, &info->protocol_config));
+
+    size_t tail_index = 6;
+    if (instruction->accounts_length == 9 || instruction->accounts_length == 10) {
+        BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->task_validation_config));
+        tail_index += 1;
+    }
+    if (instruction->accounts_length == 10) {
+        BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->task_submission));
+        tail_index += 1;
+    }
+
+    BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->rent_recipient));
+    BAIL_IF(account_at(instruction, header, (uint8_t) (tail_index + 1), &info->system_program));
+    BAIL_IF(validate_system_program(info->system_program));
+    return 0;
+}
+
 int parse_agenc_instructions(const Instruction *instruction,
                              const MessageHeader *header,
                              AgencInfo *info) {
@@ -307,7 +375,10 @@ int parse_agenc_instructions(const Instruction *instruction,
     const uint8_t *discriminator;
     BAIL_IF(parse_fixed_bytes(&parser, &discriminator, AGENC_DISCRIMINATOR_SIZE));
 
-    if (memcmp(discriminator, DISCRIMINATOR_CREATE_TASK, AGENC_DISCRIMINATOR_SIZE) == 0) {
+    if (memcmp(discriminator, DISCRIMINATOR_REGISTER_AGENT, AGENC_DISCRIMINATOR_SIZE) == 0) {
+        info->kind = AgencInstructionRegisterAgent;
+        BAIL_IF(parse_register_agent(&parser, instruction, header, &info->register_agent));
+    } else if (memcmp(discriminator, DISCRIMINATOR_CREATE_TASK, AGENC_DISCRIMINATOR_SIZE) == 0) {
         info->kind = AgencInstructionCreateTask;
         BAIL_IF(parse_create_task(&parser, instruction, header, &info->create_task));
     } else if (memcmp(discriminator,
@@ -344,6 +415,9 @@ int parse_agenc_instructions(const Instruction *instruction,
     } else if (memcmp(discriminator, DISCRIMINATOR_CANCEL_TASK, AGENC_DISCRIMINATOR_SIZE) == 0) {
         info->kind = AgencInstructionCancelTask;
         BAIL_IF(parse_cancel_task(instruction, header, &info->cancel_task));
+    } else if (memcmp(discriminator, DISCRIMINATOR_EXPIRE_CLAIM, AGENC_DISCRIMINATOR_SIZE) == 0) {
+        info->kind = AgencInstructionExpireClaim;
+        BAIL_IF(parse_expire_claim(instruction, header, &info->expire_claim));
     } else {
         return 1;
     }
@@ -430,6 +504,23 @@ static int print_create_task_fields(const AgencInfo *agenc_info) {
     BAIL_IF(set_general_pubkey("Creator", info->creator));
     BAIL_IF(set_general_timestamp("Deadline", info->deadline));
     BAIL_IF(set_general_u64("Min reputation", info->min_reputation));
+    BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));
+    return 0;
+}
+
+static int print_agenc_register_agent_info(const AgencInfo *agenc_info,
+                                           const PrintConfig *print_config) {
+    UNUSED(print_config);
+    const AgencRegisterAgentInfo *info = &agenc_info->register_agent;
+    BAIL_IF(set_primary_action("Register agent"));
+    BAIL_IF(set_general_amount("Stake", info->stake_amount));
+    BAIL_IF(set_general_pubkey("Agent", info->agent));
+    BAIL_IF(set_general_pubkey("Authority", info->authority));
+    BAIL_IF(set_general_u64("Capabilities", info->capabilities));
+    BAIL_IF(set_general_sized_string("Endpoint", &info->endpoint));
+    if (info->has_metadata_uri) {
+        BAIL_IF(set_general_sized_string("Metadata URI", &info->metadata_uri));
+    }
     BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));
     return 0;
 }
@@ -557,8 +648,30 @@ static int print_agenc_cancel_task_info(const AgencInfo *agenc_info,
     return 0;
 }
 
+static int print_agenc_expire_claim_info(const AgencInfo *agenc_info,
+                                         const PrintConfig *print_config) {
+    UNUSED(print_config);
+    const AgencExpireClaimInfo *info = &agenc_info->expire_claim;
+    BAIL_IF(set_primary_action("Expire claim"));
+    BAIL_IF(set_general_pubkey("Task", info->task));
+    BAIL_IF(set_general_pubkey("Claim", info->claim));
+    BAIL_IF(set_general_pubkey("Worker", info->worker));
+    BAIL_IF(set_general_pubkey("Authority", info->authority));
+    BAIL_IF(set_general_pubkey("Rent recipient", info->rent_recipient));
+    if (info->task_validation_config != NULL) {
+        BAIL_IF(set_general_pubkey("Validation", info->task_validation_config));
+    }
+    if (info->task_submission != NULL) {
+        BAIL_IF(set_general_pubkey("Submission", info->task_submission));
+    }
+    BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));
+    return 0;
+}
+
 int print_agenc_info(const AgencInfo *info, const PrintConfig *print_config) {
     switch (info->kind) {
+        case AgencInstructionRegisterAgent:
+            return print_agenc_register_agent_info(info, print_config);
         case AgencInstructionCreateTask:
             // V1 create-task clear signing requires the paired review config
             // instruction so the secure screen can show the review window.
@@ -577,6 +690,8 @@ int print_agenc_info(const AgencInfo *info, const PrintConfig *print_config) {
             return print_agenc_reject_task_result_info(info, print_config);
         case AgencInstructionCancelTask:
             return print_agenc_cancel_task_info(info, print_config);
+        case AgencInstructionExpireClaim:
+            return print_agenc_expire_claim_info(info, print_config);
         case AgencInstructionUnknown:
         default:
             return -1;

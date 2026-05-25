@@ -24,6 +24,7 @@ extern const Pubkey agenc_mainnet_preset_program_id;
 
 typedef enum AgencInstructionKind {
     AgencInstructionUnknown = 0,
+    AgencInstructionRegisterAgent,
     AgencInstructionCreateTask,
     AgencInstructionConfigureTaskValidation,
     AgencInstructionSetTaskJobSpec,
@@ -32,7 +33,22 @@ typedef enum AgencInstructionKind {
     AgencInstructionAcceptTaskResult,
     AgencInstructionRejectTaskResult,
     AgencInstructionCancelTask,
+    AgencInstructionExpireClaim,
 } AgencInstructionKind;
+
+typedef struct AgencRegisterAgentInfo {
+    const Pubkey *agent;
+    const Pubkey *protocol_config;
+    const Pubkey *authority;
+    const Pubkey *system_program;
+
+    const Hash *agent_id;
+    uint64_t capabilities;
+    SizedString endpoint;
+    bool has_metadata_uri;
+    SizedString metadata_uri;
+    uint64_t stake_amount;
+} AgencRegisterAgentInfo;
 
 typedef struct AgencCreateTaskInfo {
     const Pubkey *task;
@@ -144,10 +160,24 @@ typedef struct AgencCancelTaskInfo {
     size_t worker_account_count;
 } AgencCancelTaskInfo;
 
+typedef struct AgencExpireClaimInfo {
+    const Pubkey *authority;
+    const Pubkey *task;
+    const Pubkey *escrow;
+    const Pubkey *claim;
+    const Pubkey *worker;
+    const Pubkey *protocol_config;
+    const Pubkey *task_validation_config;
+    const Pubkey *task_submission;
+    const Pubkey *rent_recipient;
+    const Pubkey *system_program;
+} AgencExpireClaimInfo;
+
 typedef struct AgencInfo {
     AgencInstructionKind kind;
     const Pubkey *program_id;
     union {
+        AgencRegisterAgentInfo register_agent;
         AgencCreateTaskInfo create_task;
         AgencConfigureTaskValidationInfo configure_task_validation;
         AgencSetTaskJobSpecInfo set_task_job_spec;
@@ -156,6 +186,7 @@ typedef struct AgencInfo {
         AgencAcceptTaskResultInfo accept_task_result;
         AgencRejectTaskResultInfo reject_task_result;
         AgencCancelTaskInfo cancel_task;
+        AgencExpireClaimInfo expire_claim;
     };
 } AgencInfo;
 

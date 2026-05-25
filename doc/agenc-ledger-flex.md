@@ -36,8 +36,20 @@ APPNAME="AgenC Solana"
 Current Flex build hash:
 
 ```text
-644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
+f3da723b7b8ad700598e072a7a30cd6526efab78d4b4cb32e4c3d81617d739c1
 ```
+
+Current clear-signing coverage for the user-facing marketplace flow:
+
+- register agent
+- create task with CreatorReview configuration
+- attach job spec
+- claim task
+- submit result
+- accept result
+- reject result
+- cancel task
+- expire claim
 
 ## Icons
 
@@ -96,7 +108,7 @@ The side-by-side app was loaded successfully on a real Ledger Flex with:
 appName=AgenC Solana
 dataSize=512
 installparamsSize=345
-app.sha256=644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
+app.sha256=f3da723b7b8ad700598e072a7a30cd6526efab78d4b4cb32e4c3d81617d739c1
 ```
 
 Post-load `listApps` confirmed:

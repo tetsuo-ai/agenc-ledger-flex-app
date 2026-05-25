@@ -220,6 +220,70 @@ void test_is_agenc_program_id() {
     assert(!is_agenc_program_id(&other));
 }
 
+void test_parse_register_agent() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    uint8_t accounts[] = {0, 1, 6, SYSTEM_INDEX};
+    uint8_t data[] = {
+        0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e,  // discriminator
+        BYTES32_BS58_2,                                   // agent_id
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // capabilities
+        0x13, 0x00, 0x00, 0x00,                          // endpoint length
+        'h',  't',  't',  'p',  's',  ':',  '/',  '/',
+        'a',  'g',  'e',  'n',  't',  '.',  'l',  'o',
+        'c',  'a',  'l',                                  // endpoint
+        0x00,                                             // metadata_uri none
+        0x80, 0x96, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00,  // stake_amount
+    };
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
+    assert(info.kind == AgencInstructionRegisterAgent);
+    assert(info.register_agent.agent == &pubkeys[0]);
+    assert(info.register_agent.protocol_config == &pubkeys[1]);
+    assert(info.register_agent.authority == &pubkeys[6]);
+    assert(info.register_agent.capabilities == 1);
+    assert(info.register_agent.endpoint.length == 19);
+    assert(info.register_agent.has_metadata_uri == false);
+    assert(info.register_agent.stake_amount == 10000000);
+
+    transaction_summary_reset();
+    assert(print_agenc_info(&info, NULL) == 0);
+    assert_summary_count(7);
+    assert_display(0, "AgenC action", "Register agent");
+    assert_display(1, "Stake", "0.01 SOL");
+    assert_display(4, "Capabilities", "1");
+    assert_display(5, "Endpoint", "https://agent.local");
+}
+
+void test_process_register_agent_message() {
+    uint8_t accounts[] = {0, 1, 6, SYSTEM_INDEX};
+    uint8_t data[] = {
+        0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e,  // discriminator
+        BYTES32_BS58_2,                                   // agent_id
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // capabilities
+        0x13, 0x00, 0x00, 0x00,                          // endpoint length
+        'h',  't',  't',  'p',  's',  ':',  '/',  '/',
+        'a',  'g',  'e',  'n',  't',  '.',  'l',  'o',
+        'c',  'a',  'l',                                  // endpoint
+        0x00,                                             // metadata_uri none
+        0x80, 0x96, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00,  // stake_amount
+    };
+
+    TestMessageBuilder builder = {0};
+    build_single_agenc_message(&builder, accounts, ARRAY_LEN(accounts), data, ARRAY_LEN(data));
+    assert_process_agenc_message(&builder, 8, "Register agent");
+}
+
 void test_parse_create_task_with_review_and_print() {
     Pubkey pubkeys[12];
     init_pubkeys(pubkeys);
@@ -551,6 +615,40 @@ void test_parse_cancel_task_with_remaining_worker_accounts() {
     assert_display(5, "Worker claims", "2");
 }
 
+void test_parse_expire_claim_with_submission() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 5, 7, 8, SYSTEM_INDEX};
+    uint8_t data[] = {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
+    assert(info.kind == AgencInstructionExpireClaim);
+    assert(info.expire_claim.authority == &pubkeys[6]);
+    assert(info.expire_claim.task == &pubkeys[0]);
+    assert(info.expire_claim.claim == &pubkeys[2]);
+    assert(info.expire_claim.worker == &pubkeys[3]);
+    assert(info.expire_claim.task_validation_config == &pubkeys[5]);
+    assert(info.expire_claim.task_submission == &pubkeys[7]);
+    assert(info.expire_claim.rent_recipient == &pubkeys[8]);
+
+    transaction_summary_reset();
+    assert(print_agenc_info(&info, NULL) == 0);
+    assert_summary_count(9);
+    assert_display(0, "AgenC action", "Expire claim");
+    assert_display_title(6, "Validation");
+    assert_display_title(7, "Submission");
+}
+
 void test_process_set_task_job_spec_message() {
     uint8_t accounts[] = {2, 0, 3, 4, 5, 6, SYSTEM_INDEX};
     uint8_t data[] = {
@@ -622,6 +720,15 @@ void test_process_cancel_task_message() {
     assert_process_agenc_message(&builder, 8, "Cancel task");
     assert_display(1, "Refund", "not in tx");
     assert_display(5, "Worker claims", "2");
+}
+
+void test_process_expire_claim_message() {
+    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 8, SYSTEM_INDEX};
+    uint8_t data[] = {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
+
+    TestMessageBuilder builder = {0};
+    build_single_agenc_message(&builder, accounts, ARRAY_LEN(accounts), data, ARRAY_LEN(data));
+    assert_process_agenc_message(&builder, 8, "Expire claim");
 }
 
 void test_process_compute_budget_create_task_with_review_message() {
@@ -759,8 +866,29 @@ void test_reject_malformed_cancel_worker_accounts() {
     assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
 }
 
+void test_reject_malformed_expire_claim_accounts() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, SYSTEM_INDEX};
+    uint8_t data[] = {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
+}
+
 int main() {
     RUN_TEST(test_is_agenc_program_id);
+    RUN_TEST(test_parse_register_agent);
+    RUN_TEST(test_process_register_agent_message);
     RUN_TEST(test_parse_create_task_with_review_and_print);
     RUN_TEST(test_process_create_task_with_review_message);
     RUN_TEST(test_parse_set_task_job_spec);
@@ -775,6 +903,8 @@ int main() {
     RUN_TEST(test_process_reject_task_result_message);
     RUN_TEST(test_parse_cancel_task_with_remaining_worker_accounts);
     RUN_TEST(test_process_cancel_task_message);
+    RUN_TEST(test_parse_expire_claim_with_submission);
+    RUN_TEST(test_process_expire_claim_message);
     RUN_TEST(test_process_compute_budget_create_task_with_review_message);
     RUN_TEST(test_reject_lone_create_task_message);
     RUN_TEST(test_reject_multi_worker_create_task_with_review_message);
@@ -782,6 +912,7 @@ int main() {
     RUN_TEST(test_reject_unknown_program_id_message);
     RUN_TEST(test_reject_malformed_cancel_task_message);
     RUN_TEST(test_reject_malformed_cancel_worker_accounts);
+    RUN_TEST(test_reject_malformed_expire_claim_accounts);
 
     printf("passed\n");
     return 0;

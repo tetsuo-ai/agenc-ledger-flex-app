@@ -21,7 +21,7 @@ Current milestone:
 Current Flex build hash:
 
 ```text
-4d742f4d4cb9358f450437be75fa3413387f3a48c22ae5fe2b9395c0c0993ff8
+f3da723b7b8ad700598e072a7a30cd6526efab78d4b4cb32e4c3d81617d739c1
 ```
 
 This is an engineering fork, not a production Ledger Live release.
@@ -45,6 +45,7 @@ instead.
 The v1 parser focuses on the AgenC marketplace actions that matter for a first
 secure-screen workflow:
 
+- register agent
 - create task with review configuration
 - attach job spec
 - claim task
@@ -52,6 +53,7 @@ secure-screen workflow:
 - accept result
 - reject result
 - cancel task
+- expire claim
 
 The device derives display fields from signed Solana transaction bytes:
 
@@ -165,7 +167,7 @@ Successful hardware load parameters from the current build:
 appName=AgenC Solana
 dataSize=512
 installparamsSize=345
-app.sha256=4d742f4d4cb9358f450437be75fa3413387f3a48c22ae5fe2b9395c0c0993ff8
+app.sha256=f3da723b7b8ad700598e072a7a30cd6526efab78d4b4cb32e4c3d81617d739c1
 ```
 
 Post-load `listApps` confirmed both `Solana` and `AgenC Solana` installed on
