@@ -21,7 +21,7 @@ Current milestone:
 Current Flex build hash:
 
 ```text
-644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
+4d742f4d4cb9358f450437be75fa3413387f3a48c22ae5fe2b9395c0c0993ff8
 ```
 
 This is an engineering fork, not a production Ledger Live release.
@@ -165,11 +165,15 @@ Successful hardware load parameters from the current build:
 appName=AgenC Solana
 dataSize=512
 installparamsSize=345
-app.sha256=644d51847f8b85fbe6ab1d2002c3752f4ecccffb54e77ab6ee1369bced85aec8
+app.sha256=4d742f4d4cb9358f450437be75fa3413387f3a48c22ae5fe2b9395c0c0993ff8
 ```
 
 Post-load `listApps` confirmed both `Solana` and `AgenC Solana` installed on
 the same Ledger Flex.
+
+The latest loaded side-by-side build includes default clear-signing recognition
+for the kit mainnet program id
+`HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK`.
 
 ## Program ID Policy
 
