@@ -458,6 +458,7 @@ void test_parse_submit_task_result() {
     assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
     assert(info.kind == AgencInstructionSubmitTaskResult);
     assert(info.submit_task_result.has_result_data);
+    assert(!info.submit_task_result.has_artifact_hash);
     assert(info.submit_task_result.task_submission == &pubkeys[3]);
 
     transaction_summary_reset();
@@ -465,6 +466,53 @@ void test_parse_submit_task_result() {
     assert_summary_count(7);
     assert_display(0, "AgenC action", "Submit result");
     assert_display(5, "Result data", "included");
+}
+
+void test_parse_submit_artifact_result_hash() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, SYSTEM_INDEX};
+    uint8_t expected_artifact_hash[HASH_SIZE] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+    };
+    uint8_t data[] = {
+        0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07,  // discriminator
+        BYTES32_BS58_4,                                   // proof_hash
+        0x01,                                             // result_data some
+        'a',  'r',  't',  'i',  'f',  'a',  'c',  't',
+        ':',  's',  'h',  'a',  '2',  '5',  '6',  ':',
+        'A',  'A',  'E',  'C',  'A',  'w',  'Q',  'F',
+        'B',  'g',  'c',  'I',  'C',  'Q',  'o',  'L',
+        'D',  'A',  '0',  'O',  'D',  'x',  'A',  'R',
+        'E',  'h',  'M',  'U',  'F',  'R',  'Y',  'X',
+        'G',  'B',  'k',  'a',  'G',  'x',  'w',  'd',
+        'H',  'h',  '8',  0,    0,    0,    0,    0,
+    };
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
+    assert(info.kind == AgencInstructionSubmitTaskResult);
+    assert(info.submit_task_result.has_result_data);
+    assert(info.submit_task_result.has_artifact_hash);
+    assert(memcmp(&info.submit_task_result.artifact_hash, expected_artifact_hash, HASH_SIZE) == 0);
+
+    transaction_summary_reset();
+    assert(print_agenc_info(&info, NULL) == 0);
+    assert_summary_count(7);
+    assert_display(0, "AgenC action", "Submit result");
+    assert_display_title(5, "Artifact SHA-256");
 }
 
 void test_parse_accept_task_result_marks_reward_unknown() {

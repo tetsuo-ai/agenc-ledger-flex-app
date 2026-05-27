@@ -183,6 +183,23 @@ That id now matches the kit mainnet preset and the generated kit Ledger
 fixtures. If the deployed program id changes, regenerate the kit Ledger
 fixtures and update this parser constant in the same release.
 
+## Current Signed-Data Limits
+
+The app only displays values that are present in the signed transaction bytes.
+
+- `submit_task_result` decodes AgenC artifact result data and displays the
+  artifact SHA-256 when the kit uses `artifact:sha256:*` result data.
+- `claim_task_with_job_spec` can display the task/job-spec account addresses,
+  but cannot display the job-spec hash or URI because the current protocol
+  instruction does not carry those fields in the claim instruction data.
+- `accept_task_result` and `cancel_task` cannot display reward/refund amounts
+  because those values come from on-chain task/escrow state, not the current
+  instruction data.
+
+Showing those claim and settlement commitments on-device requires a protocol
+instruction upgrade or another commitment that is included in the bytes the
+Ledger signs.
+
 ## Relationship To The Kit
 
 This repository owns firmware parsing, display, and Ledger device tests.

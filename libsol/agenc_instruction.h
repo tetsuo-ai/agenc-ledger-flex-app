@@ -107,6 +107,8 @@ typedef struct AgencSubmitTaskResultInfo {
     const Hash *proof_hash;
     const uint8_t *result_data;
     bool has_result_data;
+    Hash artifact_hash;
+    bool has_artifact_hash;
 } AgencSubmitTaskResultInfo;
 
 typedef struct AgencAcceptTaskResultInfo {
