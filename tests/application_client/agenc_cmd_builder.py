@@ -9,7 +9,7 @@ from application_client.solana_cmd_builder import (
 )
 
 
-PROGRAM_ID_AGENC_ARTIFACT = "2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7"
+PROGRAM_ID_AGENC_ARTIFACT = "HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK"
 
 DISCRIMINATOR_CREATE_TASK = bytes.fromhex("c25006b4e87f30ab")
 DISCRIMINATOR_CONFIGURE_TASK_VALIDATION = bytes.fromhex("0b4f13bc0d20f45a")

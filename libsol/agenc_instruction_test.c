@@ -214,10 +214,7 @@ static void assert_summary_count(size_t expected_count) {
 
 void test_is_agenc_program_id() {
     assert(is_agenc_program_id(&agenc_artifact_program_id));
-
-#ifndef AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET
-    assert(!is_agenc_program_id(&agenc_mainnet_preset_program_id));
-#endif
+    assert(is_agenc_program_id(&agenc_mainnet_preset_program_id));
 
     Pubkey other = {{BYTES32_BS58_8}};
     assert(!is_agenc_program_id(&other));

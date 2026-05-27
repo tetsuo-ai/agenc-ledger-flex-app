@@ -173,22 +173,15 @@ the same Ledger Flex.
 
 ## Program ID Policy
 
-The current code recognizes the generated artifact/devnet AgenC program id by
-default:
-
-```text
-2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
-```
-
-The kit's current mainnet preset id is intentionally gated behind
-`AGENC_ENABLE_UNVERIFIED_MAINNET_PRESET` until program id, IDL layout, and
-deployment provenance are tied together.
+The current code recognizes the verified AgenC mainnet program id by default:
 
 ```text
 HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
 ```
 
-Do not enable mainnet clear signing until that mismatch is resolved.
+That id now matches the kit mainnet preset and the generated kit Ledger
+fixtures. If the deployed program id changes, regenerate the kit Ledger
+fixtures and update this parser constant in the same release.
 
 ## Relationship To The Kit
 
