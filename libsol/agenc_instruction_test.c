@@ -351,10 +351,11 @@ void test_parse_create_task_with_review_and_print() {
 
     transaction_summary_reset();
     assert(print_agenc_create_task_with_review_info(&create_info, &configure_info, NULL) == 0);
-    assert_summary_count(8);
+    assert_summary_count(9);
     assert_display(0, "AgenC action", "Create task");
     assert_display(1, "Reward", "1 SOL");
-    assert_display(7, "Review window", "3600");
+    assert_display_title(4, "Content hash");
+    assert_display(8, "Review window", "3600");
 }
 
 void test_process_create_task_with_review_message() {
@@ -423,7 +424,7 @@ void test_process_create_task_with_review_message() {
     transaction_summary_reset();
     assert(process_message_body(parser.buffer, parser.buffer_length, &print_config) == 0);
     assert(transaction_summary_set_fee_payer_pubkey(&print_config.header.pubkeys[0]) == 0);
-    assert_summary_count(9);
+    assert_summary_count(10);
 
     transaction_type_t transaction_type;
     transaction_summary_get_transaction_type(&transaction_type);
@@ -431,8 +432,8 @@ void test_process_create_task_with_review_message() {
 
     assert_display(0, "AgenC action", "Create task");
     assert_display(1, "Reward", "1 SOL");
-    assert_display(7, "Review window", "3600");
-    assert_display_title(8, "Fee payer");
+    assert_display(8, "Review window", "3600");
+    assert_display_title(9, "Fee payer");
 }
 
 void test_parse_set_task_job_spec() {
@@ -753,10 +754,10 @@ void test_process_compute_budget_create_task_with_review_message() {
 
     TestMessageBuilder builder = {0};
     build_create_review_message(&builder, create_data, ARRAY_LEN(create_data), true);
-    assert_process_agenc_message(&builder, 10, "Create task");
+    assert_process_agenc_message(&builder, 11, "Create task");
     assert_display(1, "Reward", "1 SOL");
-    assert_display(7, "Review window", "3600");
-    assert_display_title(8, "Max fees");
+    assert_display(8, "Review window", "3600");
+    assert_display_title(9, "Max fees");
 }
 
 void test_reject_lone_create_task_message() {
@@ -808,6 +809,45 @@ void test_reject_multi_worker_create_task_with_review_message() {
     TestMessageBuilder builder = {0};
     build_create_review_message(&builder, create_data, ARRAY_LEN(create_data), false);
     assert_reject_message(&builder);
+}
+
+void test_reject_create_task_non_commitment_description() {
+    // A description whose tail bytes (32..63) are non-zero is not a sha256
+    // content commitment, so it must not be clear-signed.
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 2);
+
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
+    uint8_t data[] = {
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
+        BYTES32_BS58_2,                                   // task_id
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // required_capabilities
+        // 64-byte description with a non-zero byte in the commitment tail
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0xaa,                            // non-zero tail byte
+        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,  // reward_amount
+        0x01,                                            // max_workers
+        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,  // deadline
+        0x00,                                            // task_type
+        0x00,                                            // constraint_hash none
+        0x05, 0x00,                                      // min_reputation
+        0x00,                                            // reward_mint none
+    };
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
 }
 
 void test_reject_unknown_agenc_discriminator_message() {
@@ -908,6 +948,7 @@ int main() {
     RUN_TEST(test_process_compute_budget_create_task_with_review_message);
     RUN_TEST(test_reject_lone_create_task_message);
     RUN_TEST(test_reject_multi_worker_create_task_with_review_message);
+    RUN_TEST(test_reject_create_task_non_commitment_description);
     RUN_TEST(test_reject_unknown_agenc_discriminator_message);
     RUN_TEST(test_reject_unknown_program_id_message);
     RUN_TEST(test_reject_malformed_cancel_task_message);

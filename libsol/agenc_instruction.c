@@ -195,6 +195,14 @@ static int parse_create_task(Parser *parser,
     BAIL_IF(parse_hash_ref(parser, &info->task_id));
     BAIL_IF(parse_u64(parser, &info->required_capabilities));
     BAIL_IF(parse_fixed_bytes(parser, &info->description, AGENC_DESCRIPTION_SIZE));
+    // The moderation gate stores a sha256 content commitment in `description`:
+    // the 32-byte digest in bytes 0..31, the remaining 32 bytes zero. Refuse to
+    // clear-sign anything that does not match that layout (e.g. raw prose) so the
+    // device only ever attests to a moderated content commitment.
+    for (size_t i = AGENC_HASH_SIZE; i < AGENC_DESCRIPTION_SIZE; i++) {
+        BAIL_IF(info->description[i] != 0);
+    }
+    info->description_commitment = (const Hash *) info->description;
     BAIL_IF(parse_u64(parser, &info->reward_amount));
     BAIL_IF(parse_u8(parser, &info->max_workers));
     BAIL_IF(parse_i64(parser, &info->deadline));
@@ -502,6 +510,7 @@ static int print_create_task_fields(const AgencInfo *agenc_info) {
     BAIL_IF(set_general_amount("Reward", info->reward_amount));
     BAIL_IF(set_general_pubkey("Task", info->task));
     BAIL_IF(set_general_pubkey("Creator", info->creator));
+    BAIL_IF(set_general_hash("Content hash", info->description_commitment));
     BAIL_IF(set_general_timestamp("Deadline", info->deadline));
     BAIL_IF(set_general_u64("Min reputation", info->min_reputation));
     BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));

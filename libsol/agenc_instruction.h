@@ -62,7 +62,13 @@ typedef struct AgencCreateTaskInfo {
 
     const Hash *task_id;
     uint64_t required_capabilities;
+    // On-chain `description` is a fixed [u8; 64] field. Under the moderation
+    // gate the kit fills it with a sha256 content commitment: the 32-byte
+    // digest in bytes 0..31 and a zero tail in bytes 32..63 (never prose).
+    // `description` points at the full 64-byte field; `description_commitment`
+    // aliases the first 32 bytes for hash display.
     const uint8_t *description;
+    const Hash *description_commitment;
     uint64_t reward_amount;
     uint8_t max_workers;
     int64_t deadline;
