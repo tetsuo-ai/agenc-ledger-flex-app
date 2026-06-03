@@ -1,5 +1,4 @@
 <h1 align="center">AgenC Ledger Flex App</h1>
-![Screenshot 2026-06-03 at 11 22 53](https://github.com/user-attachments/assets/3c26b69a-8735-4f27-acab-48ab2c17a5db)
 
 
 
