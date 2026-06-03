@@ -32,10 +32,10 @@ supported devices with `APPNAME="AgenC Solana"`:
 
 | Device | app.sha256 |
 |--------|------------|
-| Flex | `8034044ba9d6787801fa00efc1981b0f27e1b0307b7584d9c198c43ff0c9cee5` |
-| Stax | `6f9489d6c46911d60a090cae736db9b42ffbc561358b11ba96b6e2f7c8a2b2d9` |
-| Nano X | `cec0e3d5045ea8821a85a73f56fd35562096e09c0e025786fa14ab0740c00670` |
-| Nano S+ | `20ea6ad2f52412fd2f55628a9efd697e565c6bf96d69b1371705f12608e8ade3` |
+| Flex | `f9fc21c5ef1f59cf43dbc7e37770fef10c2a2624781bb1f91cbe7e814e75e10b` |
+| Stax | `bc476702c87304bcb615e4ecedcc0b34e8feaaab47aaf50d7d56ae79f60c6be5` |
+| Nano X | `997627d488971ffa564804c53798f8b87e8b3e80ef62781c711074298b176aff` |
+| Nano S+ | `90dac181bfb1d87fc5492272c3408fe62db93ea66271fe7d59146d638d341ecc` |
 
 These supersede the earlier Flex-only `f3da723b…` build, which predates the
 expanded create-task clear-signing coverage and needs a fresh hardware load.
