@@ -501,19 +501,39 @@ static int set_general_sized_string(const char *title, const SizedString *value)
 static int print_create_task_fields(const AgencInfo *agenc_info) {
     const AgencCreateTaskInfo *info = &agenc_info->create_task;
 
-    // The current clear-signing scaffold only represents SOL rewards. Token
-    // reward display needs token account and decimal handling before enablement.
-    BAIL_IF(info->reward_mint != NULL);
-    BAIL_IF(info->max_workers != 1);
-    BAIL_IF(info->task_type != 0);
-
-    BAIL_IF(set_general_amount("Reward", info->reward_amount));
+    if (info->reward_mint != NULL) {
+        // SPL-token reward. The on-chain amount is denominated in the token's base
+        // units and the device cannot resolve the mint's decimals offline, so show
+        // the raw amount AND the mint pubkey so the signer verifies both explicitly
+        // rather than seeing a misleading SOL-formatted value.
+        BAIL_IF(set_general_u64("Reward (token base units)", info->reward_amount));
+        BAIL_IF(set_general_pubkey("Token mint", info->reward_mint));
+    } else {
+        BAIL_IF(set_general_amount("Reward", info->reward_amount));
+    }
     BAIL_IF(set_general_pubkey("Task", info->task));
     BAIL_IF(set_general_pubkey("Creator", info->creator));
     BAIL_IF(set_general_hash("Content hash", info->description_commitment));
     BAIL_IF(set_general_timestamp("Deadline", info->deadline));
+    BAIL_IF(set_general_u64("Max workers", info->max_workers));
+    // task_type 0 is the standard task; surface any non-default type explicitly.
+    if (info->task_type != 0) {
+        BAIL_IF(set_general_u64("Task type", info->task_type));
+    }
     BAIL_IF(set_general_u64("Min reputation", info->min_reputation));
     BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));
+    return 0;
+}
+
+// Standalone create_task display (no paired review-config instruction). The kit
+// normally pairs create_task + configure_task_validation (rendered by
+// print_agenc_create_task_with_review_info), but a lone create_task is a valid
+// instruction; decoding it here is strictly safer than forcing blind signing.
+static int print_agenc_create_task_info(const AgencInfo *agenc_info,
+                                        const PrintConfig *print_config) {
+    UNUSED(print_config);
+    BAIL_IF(set_primary_action("Create task"));
+    BAIL_IF(print_create_task_fields(agenc_info));
     return 0;
 }
 
@@ -682,9 +702,10 @@ int print_agenc_info(const AgencInfo *info, const PrintConfig *print_config) {
         case AgencInstructionRegisterAgent:
             return print_agenc_register_agent_info(info, print_config);
         case AgencInstructionCreateTask:
-            // V1 create-task clear signing requires the paired review config
-            // instruction so the secure screen can show the review window.
-            return -1;
+            // Paired create_task + configure_task_validation is rendered upstream by
+            // print_agenc_create_task_with_review_info (with the review window). A lone
+            // create_task still decodes here instead of falling back to blind signing.
+            return print_agenc_create_task_info(info, print_config);
         case AgencInstructionConfigureTaskValidation:
             return print_agenc_configure_task_validation_info(info, print_config);
         case AgencInstructionSetTaskJobSpec:

@@ -1,6 +1,3 @@
-import pytest
-from ragger.error import ExceptionRAPDU
-
 from application_client import solana_utils as SOL
 from application_client.agenc_cmd_builder import (
     accept_task_result_message,
@@ -12,7 +9,6 @@ from application_client.agenc_cmd_builder import (
     reject_task_result_message,
     submit_task_result_message,
 )
-from application_client.solana import ErrorType
 from application_client.solana_cmd_builder import verify_signature
 
 
@@ -60,12 +56,9 @@ class TestAgencClearSigning:
         message = cancel_task_message(signer_pubkey)
         self._approve_and_verify(sol, scenario_navigator, root_pytest_dir, message)
 
-    def test_agenc_lone_create_task_not_clear_signed(self, sol):
+    def test_agenc_lone_create_task_ok(self, sol, scenario_navigator, root_pytest_dir):
+        # A lone create_task (no paired review config) now clear-signs standalone
+        # rather than falling back to blind signing.
         signer_pubkey = sol.get_public_key(SOL.SOL_PACKED_DERIVATION_PATH)
         message = lone_create_task_message(signer_pubkey)
-
-        with pytest.raises(ExceptionRAPDU) as exc:
-            with sol.send_async_sign_message(SOL.SOL_PACKED_DERIVATION_PATH, message):
-                pass
-
-        assert exc.value.status == ErrorType.SDK_NOT_SUPPORTED
+        self._approve_and_verify(sol, scenario_navigator, root_pytest_dir, message)

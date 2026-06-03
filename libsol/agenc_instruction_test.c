@@ -326,7 +326,8 @@ void test_parse_create_task_with_review_and_print() {
     assert(create_info.create_task.reward_mint == NULL);
     assert(create_info.create_task.creator == &pubkeys[6]);
     transaction_summary_reset();
-    assert(print_agenc_info(&create_info, NULL) != 0);
+    // A lone create_task now decodes (renders standalone) instead of forcing blind signing.
+    assert(print_agenc_info(&create_info, NULL) == 0);
 
     uint8_t configure_accounts[] = {0, 4, 5, 2, 6, SYSTEM_INDEX};
     uint8_t configure_data[] = {
@@ -351,11 +352,12 @@ void test_parse_create_task_with_review_and_print() {
 
     transaction_summary_reset();
     assert(print_agenc_create_task_with_review_info(&create_info, &configure_info, NULL) == 0);
-    assert_summary_count(9);
+    assert_summary_count(10);
     assert_display(0, "AgenC action", "Create task");
     assert_display(1, "Reward", "1 SOL");
     assert_display_title(4, "Content hash");
-    assert_display(8, "Review window", "3600");
+    assert_display(6, "Max workers", "1");
+    assert_display(9, "Review window", "3600");
 }
 
 void test_process_create_task_with_review_message() {
@@ -424,7 +426,7 @@ void test_process_create_task_with_review_message() {
     transaction_summary_reset();
     assert(process_message_body(parser.buffer, parser.buffer_length, &print_config) == 0);
     assert(transaction_summary_set_fee_payer_pubkey(&print_config.header.pubkeys[0]) == 0);
-    assert_summary_count(10);
+    assert_summary_count(11);
 
     transaction_type_t transaction_type;
     transaction_summary_get_transaction_type(&transaction_type);
@@ -432,8 +434,9 @@ void test_process_create_task_with_review_message() {
 
     assert_display(0, "AgenC action", "Create task");
     assert_display(1, "Reward", "1 SOL");
-    assert_display(8, "Review window", "3600");
-    assert_display_title(9, "Fee payer");
+    assert_display(6, "Max workers", "1");
+    assert_display(9, "Review window", "3600");
+    assert_display_title(10, "Fee payer");
 }
 
 void test_parse_set_task_job_spec() {
@@ -754,13 +757,14 @@ void test_process_compute_budget_create_task_with_review_message() {
 
     TestMessageBuilder builder = {0};
     build_create_review_message(&builder, create_data, ARRAY_LEN(create_data), true);
-    assert_process_agenc_message(&builder, 11, "Create task");
+    assert_process_agenc_message(&builder, 12, "Create task");
     assert_display(1, "Reward", "1 SOL");
-    assert_display(8, "Review window", "3600");
-    assert_display_title(9, "Max fees");
+    assert_display(6, "Max workers", "1");
+    assert_display(9, "Review window", "3600");
+    assert_display_title(10, "Max fees");
 }
 
-void test_reject_lone_create_task_message() {
+void test_process_lone_create_task_message() {
     uint8_t accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
     uint8_t data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
@@ -783,10 +787,12 @@ void test_reject_lone_create_task_message() {
 
     TestMessageBuilder builder = {0};
     build_single_agenc_message(&builder, accounts, ARRAY_LEN(accounts), data, ARRAY_LEN(data));
-    assert_reject_message(&builder);
+    // A lone create_task (no paired review config) now decodes standalone instead of blind signing.
+    assert_process_agenc_message(&builder, 10, "Create task");
+    assert_display(6, "Max workers", "1");
 }
 
-void test_reject_multi_worker_create_task_with_review_message() {
+void test_process_multi_worker_create_task_with_review_message() {
     uint8_t create_data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
         BYTES32_BS58_2,
@@ -808,7 +814,37 @@ void test_reject_multi_worker_create_task_with_review_message() {
 
     TestMessageBuilder builder = {0};
     build_create_review_message(&builder, create_data, ARRAY_LEN(create_data), false);
-    assert_reject_message(&builder);
+    // Multi-worker tasks now clear-sign, showing the worker count explicitly.
+    assert_process_agenc_message(&builder, 11, "Create task");
+    assert_display(6, "Max workers", "2");
+}
+
+void test_process_custom_task_type_create_task_with_review_message() {
+    uint8_t create_data[] = {
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
+        BYTES32_BS58_2,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
+        0,    0,    0,    0,
+        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,
+        0x01,                                            // max_workers
+        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,
+        0x02,                                            // task_type (non-default)
+        0x00,
+        0x05, 0x00,
+        0x00,
+    };
+
+    TestMessageBuilder builder = {0};
+    build_create_review_message(&builder, create_data, ARRAY_LEN(create_data), false);
+    // A non-default task_type now clear-signs, showing the type explicitly.
+    assert_process_agenc_message(&builder, 12, "Create task");
+    assert_display(6, "Max workers", "1");
+    assert_display(7, "Task type", "2");
 }
 
 void test_reject_create_task_non_commitment_description() {
@@ -946,8 +982,9 @@ int main() {
     RUN_TEST(test_parse_expire_claim_with_submission);
     RUN_TEST(test_process_expire_claim_message);
     RUN_TEST(test_process_compute_budget_create_task_with_review_message);
-    RUN_TEST(test_reject_lone_create_task_message);
-    RUN_TEST(test_reject_multi_worker_create_task_with_review_message);
+    RUN_TEST(test_process_lone_create_task_message);
+    RUN_TEST(test_process_multi_worker_create_task_with_review_message);
+    RUN_TEST(test_process_custom_task_type_create_task_with_review_message);
     RUN_TEST(test_reject_create_task_non_commitment_description);
     RUN_TEST(test_reject_unknown_agenc_discriminator_message);
     RUN_TEST(test_reject_unknown_program_id_message);
