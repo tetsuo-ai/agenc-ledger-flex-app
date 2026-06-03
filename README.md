@@ -6,11 +6,6 @@
   <img src="doc/agenc-ledger-stack.svg" alt="AgenC clear-signing stack: marketplace kit → DMK → transport → AgenC Solana app → Ledger device" width="720">
 </p>
 
-<p align="center">
-  <img alt="AgenC Solana clear-signing review screens on a Ledger Flex" width="760" src="https://github.com/user-attachments/assets/22f8a4b3-4861-4512-82d7-bc0bc2682bc1" />
-</p>
-
-
 
 Private firmware workspace for an AgenC-aware Ledger Flex signing app.
 
