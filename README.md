@@ -1,4 +1,7 @@
 # AgenC Ledger Flex App
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/22f8a4b3-4861-4512-82d7-bc0bc2682bc1" />
+
+
 
 Private firmware workspace for an AgenC-aware Ledger Flex signing app.
 
@@ -206,21 +209,35 @@ for the kit mainnet program id
 
 ## Program ID Policy
 
-The current side-by-side `AgenC Solana` app recognizes the kit's mainnet
-program id by default for clear-signing tests:
+The current code recognizes the verified AgenC mainnet program id by default:
 
 ```text
 HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
 ```
 
-The generated artifact/devnet id remains accepted for parser fixtures only:
-
-```text
-2jdBSJ8U5ixfwgs1bRLPtRRnpZAPm8Xv1tEdu8yjHJC7
-```
+That id now matches the kit mainnet preset and the generated kit Ledger
+fixtures. If the deployed program id changes, regenerate the kit Ledger
+fixtures and update this parser constant in the same release.
 
 If a mainnet AgenC transaction does not show the `AgenC action` screens on the
 device, reject it.
+
+## Current Signed-Data Limits
+
+The app only displays values that are present in the signed transaction bytes.
+
+- `submit_task_result` decodes AgenC artifact result data and displays the
+  artifact SHA-256 when the kit uses `artifact:sha256:*` result data.
+- `claim_task_with_job_spec` can display the task/job-spec account addresses,
+  but cannot display the job-spec hash or URI because the current protocol
+  instruction does not carry those fields in the claim instruction data.
+- `accept_task_result` and `cancel_task` cannot display reward/refund amounts
+  because those values come from on-chain task/escrow state, not the current
+  instruction data.
+
+Showing those claim and settlement commitments on-device requires a protocol
+instruction upgrade or another commitment that is included in the bytes the
+Ledger signs.
 
 ## Relationship To The Kit
 

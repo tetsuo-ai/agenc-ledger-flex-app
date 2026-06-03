@@ -9,6 +9,9 @@
 #define AGENC_HASH_SIZE          32
 #define AGENC_DESCRIPTION_SIZE   64
 #define AGENC_RESULT_DATA_SIZE   64
+#define AGENC_ARTIFACT_RESULT_PREFIX      "artifact:sha256:"
+#define AGENC_ARTIFACT_RESULT_PREFIX_SIZE 16
+#define AGENC_ARTIFACT_RESULT_B64_SIZE    43
 
 #define AGENC_REGISTER_AGENT_ACCOUNTS             4
 #define AGENC_CREATE_TASK_ACCOUNTS               8
@@ -115,6 +118,64 @@ static int parse_optional_result_data(Parser *parser,
     }
     *has_result_data = true;
     return parse_fixed_bytes(parser, result_data, AGENC_RESULT_DATA_SIZE);
+}
+
+static int base64url_value(uint8_t character) {
+    if (character >= 'A' && character <= 'Z') {
+        return character - 'A';
+    }
+    if (character >= 'a' && character <= 'z') {
+        return character - 'a' + 26;
+    }
+    if (character >= '0' && character <= '9') {
+        return character - '0' + 52;
+    }
+    if (character == '-') {
+        return 62;
+    }
+    if (character == '_') {
+        return 63;
+    }
+    return -1;
+}
+
+static bool decode_artifact_result_hash(const uint8_t *result_data, Hash *artifact_hash) {
+    if (memcmp(result_data,
+               AGENC_ARTIFACT_RESULT_PREFIX,
+               AGENC_ARTIFACT_RESULT_PREFIX_SIZE) != 0) {
+        return false;
+    }
+
+    size_t text_length = 0;
+    while (text_length < AGENC_RESULT_DATA_SIZE && result_data[text_length] != 0) {
+        ++text_length;
+    }
+    if (text_length != AGENC_ARTIFACT_RESULT_PREFIX_SIZE + AGENC_ARTIFACT_RESULT_B64_SIZE) {
+        return false;
+    }
+
+    uint32_t accumulator = 0;
+    uint8_t bits = 0;
+    size_t output_length = 0;
+    uint8_t *output = (uint8_t *) artifact_hash;
+    for (size_t i = AGENC_ARTIFACT_RESULT_PREFIX_SIZE; i < text_length; ++i) {
+        int value = base64url_value(result_data[i]);
+        if (value < 0) {
+            return false;
+        }
+        accumulator = (accumulator << 6) | (uint32_t) value;
+        bits += 6;
+        while (bits >= 8) {
+            bits -= 8;
+            if (output_length >= AGENC_HASH_SIZE) {
+                return false;
+            }
+            output[output_length++] = (uint8_t) ((accumulator >> bits) & 0xff);
+            accumulator &= (1u << bits) - 1u;
+        }
+    }
+
+    return output_length == AGENC_HASH_SIZE && accumulator == 0;
 }
 
 static int parse_borsh_string(Parser *parser, SizedString *string) {
@@ -284,6 +345,9 @@ static int parse_submit_task_result(Parser *parser,
 
     BAIL_IF(parse_hash_ref(parser, &info->proof_hash));
     BAIL_IF(parse_optional_result_data(parser, &info->result_data, &info->has_result_data));
+    if (info->has_result_data) {
+        info->has_artifact_hash = decode_artifact_result_hash(info->result_data, &info->artifact_hash);
+    }
     return 0;
 }
 
@@ -628,7 +692,11 @@ static int print_agenc_submit_task_result_info(const AgencInfo *agenc_info,
     BAIL_IF(set_general_pubkey("Task", info->task));
     BAIL_IF(set_general_pubkey("Worker", info->worker));
     BAIL_IF(set_general_pubkey("Submission", info->task_submission));
-    BAIL_IF(set_general_string("Result data", info->has_result_data ? "included" : "none"));
+    if (info->has_artifact_hash) {
+        BAIL_IF(set_general_hash("Artifact SHA-256", &info->artifact_hash));
+    } else {
+        BAIL_IF(set_general_string("Result data", info->has_result_data ? "included" : "none"));
+    }
     BAIL_IF(set_general_pubkey("Program", agenc_info->program_id));
     return 0;
 }
