@@ -1,4 +1,7 @@
 # AgenC Ledger Flex App
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/22f8a4b3-4861-4512-82d7-bc0bc2682bc1" />
+
+
 
 Private firmware workspace for an AgenC-aware Ledger Flex signing app.
 
