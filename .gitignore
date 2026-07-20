@@ -12,6 +12,8 @@ libsol/target
 
 # Python
 __pycache__
+.venv
+.venv-*
 .egg
 .pyc
 *~

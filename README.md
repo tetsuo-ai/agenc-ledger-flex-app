@@ -33,8 +33,12 @@ Current milestone:
 - host unit tests cover the parser/display; Ragger golden-image tests cover the
   on-device secure screens
 
-Current reproducible build hashes (`bin/app.sha256`), source-built for all four
-supported devices with `APPNAME="AgenC Solana"`:
+The independent AgenC release target is recorded in [`VERSION`](VERSION), with
+user-visible changes in [`CHANGELOG.md`](CHANGELOG.md). It is intentionally
+separate from the upstream Solana application version in `Makefile`.
+
+Last published v0.2.0 Ledger application hashes (`bin/app.sha256`), source-built
+for all four supported devices with `APPNAME="AgenC Solana"`:
 
 | Device | app.sha256 |
 |--------|------------|
@@ -43,8 +47,14 @@ supported devices with `APPNAME="AgenC Solana"`:
 | Nano X | `997627d488971ffa564804c53798f8b87e8b3e80ef62781c711074298b176aff` |
 | Nano S+ | `90dac181bfb1d87fc5492272c3408fe62db93ea66271fe7d59146d638d341ecc` |
 
-These supersede the earlier Flex-only `f3da723b…` build, which predates the
-expanded create-task clear-signing coverage and needs a fresh hardware load.
+These hashes do not represent the unreleased revision-5 candidate. They
+superseded the earlier Flex-only `f3da723b…` build, but a fresh reviewed build is
+required before publishing or loading the current candidate.
+
+`bin/app.sha256` is the installable-application hash emitted by
+`ledgerblue.loadApp --offline`; it is not the ordinary file checksum of
+`app.elf` or `app.hex`. GitHub releases include a conventional `SHA256SUMS`
+manifest for verifying every downloadable artifact.
 
 This is an engineering fork, not a production Ledger Live release.
 
@@ -58,9 +68,9 @@ For hardware testing, this fork is packaged as a separate Ledger app:
 AgenC Solana
 ```
 
-Do not use upstream `make load` for this fork. The upstream default targets app
-name `Solana` with `--delete`. Use the guarded scripts under `tools/agenc/`
-instead.
+Do not use `make load` for this fork. It bypasses the explicit side-by-side
+confirmation and reviewed Python environment. Use the guarded, hash-locked
+scripts under `tools/agenc/` instead.
 
 ## Clear-Signing Scope
 
@@ -136,7 +146,8 @@ Build the side-by-side Flex app:
 tools/agenc/build-flex.sh
 ```
 
-This uses Ledger's dev-tools container and builds with:
+This uses the reviewed Linux/amd64 Ledger builder image pinned by digest in the
+script. The Makefile defaults to the required side-by-side identity:
 
 ```text
 APPNAME="AgenC Solana"
@@ -154,27 +165,18 @@ The output is written to:
 Run the C parser/message tests:
 
 ```sh
-docker run --rm -v "$PWD:/app" -w /app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest \
-  make -C libsol clean
-
-docker run --rm -v "$PWD:/app" -w /app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest \
-  make -C libsol
+LEDGER_BUILDER_LITE='ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7'
+docker run --rm --platform linux/amd64 -v "$PWD:/app" -w /app \
+  "$LEDGER_BUILDER_LITE" sh -lc 'make -C libsol clean && make -C libsol'
 ```
 
-Run focused Flex Ragger/Speculos tests:
+Run focused Flex Ragger/Speculos tests with Python 3.12 and the committed hash
+lock. `qemu-arm-static` must already be available on the host.
 
 ```sh
-docker run --rm -v "$PWD:/app" -w /app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
-  sh -lc 'rm -rf .tmp-ragger && trap "rm -rf .tmp-ragger" EXIT &&
-  mkdir -p .tmp-ragger/tmp .tmp-ragger/cache &&
-  TMPDIR=/app/.tmp-ragger/tmp python3 -m venv --system-site-packages .tmp-ragger/venv &&
-  . .tmp-ragger/venv/bin/activate &&
-  TMPDIR=/app/.tmp-ragger/tmp PIP_CACHE_DIR=/app/.tmp-ragger/cache \
-    python -m pip install --no-cache-dir base58 ecdsa solders solana "ragger[tests]" &&
-  pytest tests/python/test_agenc_clear_signing.py --tb=short -v --device flex'
+tools/agenc/setup-python-env.sh .venv-ragger tests/python/requirements-ci.txt
+.venv-ragger/bin/pytest tests/python/test_agenc_clear_signing.py \
+  --tb=short -v --device flex
 ```
 
 ## Hardware Loading
@@ -182,19 +184,23 @@ docker run --rm -v "$PWD:/app" -w /app \
 Confirm the Flex is visible:
 
 ```sh
-tools/agenc/list-flex-apps.sh
+tools/agenc/setup-python-env.sh .venv-ledgerblue \
+  tools/agenc/requirements-ledgerblue.txt
+PYTHON=.venv-ledgerblue/bin/python tools/agenc/list-flex-apps.sh
 ```
 
 Generate a side-by-side offline APDU:
 
 ```sh
-tools/agenc/generate-load-apdu.sh
+PYTHON=.venv-ledgerblue/bin/python tools/agenc/generate-load-apdu.sh
 ```
 
 Load the app only after confirming the target is `AgenC Solana`:
 
 ```sh
-AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1 tools/agenc/load-flex.sh
+AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1 \
+  PYTHON=.venv-ledgerblue/bin/python \
+  tools/agenc/load-flex.sh
 ```
 
 The load script refuses to run without `AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1`.

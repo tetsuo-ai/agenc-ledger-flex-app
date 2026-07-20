@@ -32,6 +32,9 @@ jobs:
       - name: Verify immutable workflow dependencies
         run: bash .github/scripts/check-workflow-pins.sh
 
+      - name: Verify release-version policy
+        run: bash .github/scripts/test-release-version.sh
+
       - name: Check C formatting
         shell: bash
         run: |
@@ -67,4 +70,4 @@ jobs:
             --builtin clear,rare \
             --check-filenames \
             --skip '*/printer_test.c' \
-            src/ libsol/ Makefile README.md doc/
+            src/ libsol/ Makefile README.md CHANGELOG.md doc/

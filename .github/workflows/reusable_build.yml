@@ -265,7 +265,8 @@ jobs:
               find "${binary_path}" -mindepth 3 -maxdepth 3 -type d -exec rm -rf -- {} +
               rm -rf -- "${binary_path}/release"
           else
-              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d ! -name 'bin' -exec rm -rf -- {} +
+              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d \
+                ! -name 'bin' ! -name 'dbg' -exec rm -rf -- {} +
           fi
         env:
           NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
@@ -476,7 +477,8 @@ jobs:
               find "${binary_path}" -mindepth 3 -maxdepth 3 -type d -exec rm -rf -- {} +
               rm -rf -- "${binary_path}/release"
           else
-              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d ! -name 'bin' -exec rm -rf -- {} +
+              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d \
+                ! -name 'bin' ! -name 'dbg' -exec rm -rf -- {} +
           fi
         env:
           NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}

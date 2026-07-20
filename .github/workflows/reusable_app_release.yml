@@ -11,7 +11,7 @@ on:
         default: ${{ github.repository }}
         type: string
       app_ref_name:
-        description: 'The release version/tag used for validation and artifact names'
+        description: 'The exact agenc-flex-v<semver> release tag'
         required: false
         default: ${{ github.ref_name }}
         type: string
@@ -46,10 +46,12 @@ jobs:
       app_repository: ${{ inputs.app_repository }}
       app_branch_name: ${{ inputs.app_revision }}
 
-  check-tag:
-    name: Check that tag matches last changelog entry (c apps) or cargo.toml version (rust apps)
-    needs: call_get_app_metadata
+  check_tag:
+    name: Validate AgenC release tag and metadata
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      prerelease: ${{ steps.validate.outputs.prerelease }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -57,13 +59,10 @@ jobs:
           repository: ${{ inputs.app_repository }}
           ref: ${{ inputs.app_revision }}
           persist-credentials: false
-      - name: Check tag against changelog or cargo.toml
+      - name: Validate release metadata
+        id: validate
         shell: bash
         run: |
-          if [[ ! "${APP_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Release tag must be an exact x.y.z semantic version." >&2
-            exit 1
-          fi
           if [[ ! "${APP_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Error: Release builds require an immutable 40-character commit SHA." >&2
             exit 1
@@ -72,35 +71,12 @@ jobs:
             echo "Error: Releases may only build this repository." >&2
             exit 1
           fi
-          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "false" ]; then
-            # For C apps, check that the tag matches the last entry in CHANGELOG.md
-            if [ -f CHANGELOG.md ]; then
-              LAST_CHANGELOG_VERSION=$(awk '/^## \[/{print $2; exit}' CHANGELOG.md | tr -d '[]')
-              if [ "$LAST_CHANGELOG_VERSION" != "${APP_REF_NAME}" ]; then
-                echo "Error: The latest version in CHANGELOG.md ($LAST_CHANGELOG_VERSION) does not match the tag being released (${APP_REF_NAME}). Please update CHANGELOG.md."
-                exit 1
-              fi
-            else
-              echo "Error: CHANGELOG.md is required for a C application release." >&2
-              exit 1
-            fi
-          else
-            # For Rust apps, check that the tag matches the version in Cargo.toml
-            if [ -f Cargo.toml ]; then
-              CARGO_VERSION=$(awk -F\" '/^version =/{print $2; exit}' Cargo.toml)
-              if [ "$CARGO_VERSION" != "${APP_REF_NAME}" ]; then
-                echo "Error: The version in Cargo.toml ($CARGO_VERSION) does not match the tag being released (${APP_REF_NAME}). Please update Cargo.toml."
-                exit 1
-              fi
-            else
-              echo "Error: Cargo.toml is required for a Rust application release." >&2
-              exit 1
-            fi
-          fi
-        env:
-          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+
+          bash .github/scripts/validate-release-version.sh --metadata \
+            "${APP_REF_NAME}" VERSION CHANGELOG.md >> "${GITHUB_OUTPUT}"
 
   build_app:
+    needs: check_tag
     uses: ./.github/workflows/reusable_build.yml
     with:
       app_repository: ${{ inputs.app_repository }}
@@ -109,8 +85,8 @@ jobs:
       upload_app_binaries_artifact: 'app_binaries'
 
   release:
-    name: Create GitHub release with ELF binaries
-    needs: [call_get_app_metadata, check-tag, build_app]
+    name: Create GitHub release with verified build artifacts
+    needs: [call_get_app_metadata, check_tag, build_app]
     runs-on: ubuntu-24.04
     permissions:
       contents: write  # Required to create the validated tag's GitHub release.
@@ -128,8 +104,11 @@ jobs:
           name: app_binaries
           path: binaries
 
-      - name: Rename ELF files per device
+      - name: Prepare release artifacts
+        shell: bash
         run: |
+          set -euo pipefail
+
           echo "binaries directory structure:"
           find binaries -maxdepth 4 -print | sort
 
@@ -147,60 +126,82 @@ jobs:
               exit 1
             fi
             if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = 'false' ]; then
-              if [ -f "${device_dir}/bin/app.elf" ]; then
-                cp "${device_dir}/bin/app.elf" "release_assets/app-${APP_REF_NAME}-${device_name}.elf"
-              fi
+              required_assets=(
+                'bin/app.elf:elf'
+                'bin/app.hex:hex'
+                'bin/app.sha256:sha256'
+                'dbg/app.map:map'
+              )
+              for asset_spec in "${required_assets[@]}"; do
+                source_path=${asset_spec%%:*}
+                extension=${asset_spec##*:}
+                if [ ! -f "${device_dir}/${source_path}" ]; then
+                  echo "Missing ${source_path} release asset for ${device_name}." >&2
+                  exit 1
+                fi
+                cp -- "${device_dir}/${source_path}" \
+                  "release_assets/agenc-solana-${device_name}-v${RELEASE_VERSION}.${extension}"
+              done
             else
               rust_app_path=$(find "binaries/${device_name}/release" -type f ! -name '*.*' -print -quit)
               if [ -n "$rust_app_path" ] && [ -f "$rust_app_path" ]; then
-                cp "$rust_app_path" "release_assets/app-${APP_REF_NAME}-${device_name}.elf"
+                cp -- "$rust_app_path" \
+                  "release_assets/agenc-solana-${device_name}-v${RELEASE_VERSION}.elf"
+              else
+                echo "Missing Rust ELF release asset for ${device_name}." >&2
+                exit 1
               fi
             fi
           done
 
-          release_assets=(release_assets/*.elf)
-          if (( ${#release_assets[@]} == 0 )); then
-            echo "No ELF release assets were produced." >&2
-            exit 1
-          fi
+          (
+            cd release_assets
+            mapfile -t checksum_files < <(
+              find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' |
+                LC_ALL=C sort
+            )
+            if (( ${#checksum_files[@]} == 0 )); then
+              echo "No release assets were produced." >&2
+              exit 1
+            fi
+            sha256sum -- "${checksum_files[@]}" > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
 
           echo "Release assets prepared in 'release_assets' directory:"
           find release_assets -maxdepth 2 -print | sort
         env:
           NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          RELEASE_VERSION: ${{ needs.check_tag.outputs.version }}
 
       - name: Extract release notes from changelog
-        id: extract_release_notes
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.check_tag.outputs.version }}
         run: |
-          if [ -f CHANGELOG.md ]; then
-            VERSION="${APP_REF_NAME}"
-            # Extract the section for this version from CHANGELOG.md
-            # Matches from "## [x.y.z]" until the next "## [" or end of file
-            NOTES=$(awk -v ver="$VERSION" '
-              BEGIN { found=0 }
+          set -euo pipefail
+
+          awk -v ver="${RELEASE_VERSION}" '
+              BEGIN { found=0; target="## [" ver "] - " }
               /^## \[/ {
                 if (found) exit
-                if (index($0, "[" ver "]")) { found=1; next }
+                if (index($0, target) == 1) { found=1; next }
               }
               found { print }
-            ' CHANGELOG.md)
-
-            if [ -z "$NOTES" ]; then
-              echo "Warning: No changelog entry found for version $VERSION"
-              NOTES="Release $VERSION"
-            fi
-
-            # Write to file to avoid delimiter issues
-            echo "$NOTES" > release_notes.md
-          else
-            echo "No CHANGELOG.md found, no release message will be added in github release."
-            touch release_notes.md
+            ' CHANGELOG.md > release_notes.md
+          if ! grep -q '[^[:space:]]' release_notes.md; then
+            echo "Release notes for ${RELEASE_VERSION} are empty." >&2
+            exit 1
           fi
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ needs.check_tag.outputs.prerelease }}
+          RELEASE_VERSION: ${{ needs.check_tag.outputs.version }}
         run: |
+          set -euo pipefail
+
           tag_type=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${APP_REF_NAME}" --jq '.object.type')
           tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${APP_REF_NAME}" --jq '.object.sha')
           for _ in 1 2 3 4 5; do
@@ -220,12 +221,20 @@ jobs:
           fi
 
           shopt -s nullglob
-          assets=(release_assets/*.elf)
+          assets=(release_assets/*)
           if (( ${#assets[@]} == 0 )); then
             echo "No release assets are available." >&2
             exit 1
           fi
+
+          release_flags=(
+            --verify-tag
+            --notes-file release_notes.md
+            --title "AgenC Solana v${RELEASE_VERSION}"
+          )
+          if [ "${IS_PRERELEASE}" = "true" ]; then
+            release_flags+=(--prerelease)
+          fi
           gh release create "${APP_REF_NAME}" \
-            --verify-tag \
-            --notes-file release_notes.md \
+            "${release_flags[@]}" \
             "${assets[@]}"

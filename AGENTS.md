@@ -39,8 +39,10 @@ The AgenC additions are isolated and additive — see [Repository layout](#repos
 ## Prerequisites
 
 - **Docker** (for the Ledger app builder image — no local ARM toolchain needed).
-- **Python 3** with `ledgerblue` (for side-loading / listing apps). A venv is fine:
-  `python3 -m venv .venv && . .venv/bin/activate && pip install ledgerblue`.
+- **Python 3.12** with the hash-locked `ledgerblue` environment used for
+  side-loading and listing apps:
+  `tools/agenc/setup-python-env.sh .venv-ledgerblue tools/agenc/requirements-ledgerblue.txt`.
+  Pass `PYTHON=.venv-ledgerblue/bin/python` to the load/list helper scripts.
 - A **Ledger Flex**, firmware up to date, **unlocked**, connected over **USB** for
   loading (side-loading is USB-only).
 
@@ -53,18 +55,20 @@ The AgenC additions are isolated and additive — see [Repository layout](#repos
 tools/agenc/build-flex.sh
 ```
 
-This runs `ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest` and
-builds with `APPNAME="AgenC Solana"`. Outputs:
+This runs the reviewed Linux/amd64 Ledger builder image pinned by digest in the
+script and builds with `APPNAME="AgenC Solana"`. Outputs:
 - `bin/app.hex` — the loadable app
 - `debug/app.map` — symbol map (needed by the loader)
-- `bin/app.sha256` — recorded build hash
+- `bin/app.sha256` — Ledger installable-application hash (not the ELF/HEX file
+  checksum)
 
 For other devices, build inside the same image with the matching SDK env var
-(`$FLEX_SDK`, `$STAX_SDK`, `$NANOX_SDK`, `$NANOS2_SDK`):
+(`$FLEX_SDK`, `$STAX_SDK`, `$NANOX_SDK`, `$NANOSP_SDK`, `$APEX_P_SDK`):
 
 ```bash
+LEDGER_BUILDER_LITE='ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7'
 docker run --rm -v "$PWD:/app" -w /app --user "$(id -u):$(id -g)" \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
+  --platform linux/amd64 "$LEDGER_BUILDER_LITE" \
   sh -lc 'BOLOS_SDK=$STAX_SDK make clean && BOLOS_SDK=$STAX_SDK make APPNAME="\"AgenC Solana\""'
 ```
 
@@ -73,8 +77,9 @@ docker run --rm -v "$PWD:/app" -w /app --user "$(id -u):$(id -g)" \
 Host unit tests for the decoder (inside the builder image so the SDK headers resolve):
 
 ```bash
+LEDGER_BUILDER_LITE='ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7'
 docker run --rm -v "$PWD:/app" -w /app --user "$(id -u):$(id -g)" \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
+  --platform linux/amd64 "$LEDGER_BUILDER_LITE" \
   sh -lc 'BOLOS_SDK=$FLEX_SDK make -C libsol clean && BOLOS_SDK=$FLEX_SDK make -C libsol'
 ```
 
@@ -85,7 +90,9 @@ Ragger golden-image (snapshot) tests for the on-device screens live under
 
 ```bash
 # Build first (step 1), then, with the Flex unlocked and ready:
-AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1 tools/agenc/load-flex.sh
+AGENC_CONFIRM_SIDE_BY_SIDE_LOAD=1 \
+  PYTHON=.venv-ledgerblue/bin/python \
+  tools/agenc/load-flex.sh
 ```
 
 The loader installs/updates **only** the side-by-side app named "AgenC Solana"
@@ -94,7 +101,8 @@ The loader installs/updates **only** the side-by-side app named "AgenC Solana"
 ## 4. Verify
 
 ```bash
-tools/agenc/list-flex-apps.sh   # expect "AgenC Solana" alongside "Solana"
+PYTHON=.venv-ledgerblue/bin/python tools/agenc/list-flex-apps.sh
+# Expect "AgenC Solana" alongside "Solana".
 ```
 
 ---

@@ -29,8 +29,9 @@ endif
 ########################################
 #        Mandatory configuration       #
 ########################################
-# Application name
-APPNAME = "Solana"
+# Application name. Keep the AgenC fork side-by-side with Ledger's official
+# Solana application in every build path, including CI and releases.
+APPNAME = "AgenC Solana"
 
 # Application version
 APPVERSION_M = 1

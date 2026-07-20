@@ -289,10 +289,8 @@ jobs:
 
           venv="${RUNNER_TEMP}/ragger-venv"
           python3 -m venv "${venv}"
-          "${venv}/bin/python" -m pip install --disable-pip-version-check --no-deps \
-            'setuptools @ https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl#sha256=062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922' \
-            'wheel @ https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl#sha256=708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248' \
-            'packaging @ https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl#sha256=5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e'
+          "${venv}/bin/python" -m pip install --disable-pip-version-check \
+            --no-deps --require-hashes -r .github/python-build-requirements.txt
           "${venv}/bin/python" -m pip install --disable-pip-version-check \
             --require-hashes --no-build-isolation -r "${requirements_lock}"
           echo "${venv}/bin" >> "${GITHUB_PATH}"
