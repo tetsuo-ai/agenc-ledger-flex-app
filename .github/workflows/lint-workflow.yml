@@ -15,17 +15,17 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
 
       - name: Lint src
-        uses: DoozyX/clang-format-lint-action@v0.13
+        uses: DoozyX/clang-format-lint-action@c71d0bf4e21876ebec3e5647491186f8797fde31 # v0.13
         with:
           source: './src'
           extensions: 'h,c'
           clangFormatVersion: 12.0.0
 
       - name: Lint libsol
-        uses: DoozyX/clang-format-lint-action@v0.13
+        uses: DoozyX/clang-format-lint-action@c71d0bf4e21876ebec3e5647491186f8797fde31 # v0.13
         with:
           source: './libsol'
           extensions: 'h,c'
@@ -36,10 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Check misspellings
-        uses: codespell-project/actions-codespell@v1
+        uses: codespell-project/actions-codespell@22ff5a2e4b591290baf82d47c9feadac31c65441 # v1
         with:
           builtin: clear,rare
           check_filenames: true

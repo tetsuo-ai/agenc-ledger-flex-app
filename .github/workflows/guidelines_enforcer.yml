@@ -25,4 +25,4 @@ concurrency:
 jobs:
   guidelines_enforcer:
     name: Call Ledger guidelines_enforcer
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_guidelines_enforcer.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_guidelines_enforcer.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
