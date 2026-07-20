@@ -126,8 +126,12 @@ static void build_create_review_message(TestMessageBuilder *builder,
         0x03,
         0x00,
     };
-    uint8_t create_accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
-    uint8_t configure_accounts[] = {0, 4, 5, 2, 6, SYSTEM_INDEX};
+    uint8_t create_accounts[] = {
+        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+    };
+    uint8_t configure_accounts[] = {0, 4, 5, 2, 3, 6, SYSTEM_INDEX};
     uint8_t configure_data[] = {
         0x0b, 0x4f, 0x13, 0xbc, 0x0d, 0x20, 0xf4, 0x5a,  // discriminator
         0x01,                                            // mode
@@ -289,7 +293,11 @@ void test_parse_create_task_with_review_and_print() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 2);
 
-    uint8_t create_accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
+    uint8_t create_accounts[] = {
+        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+    };
     uint8_t create_data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
         BYTES32_BS58_2,                                   // task_id
@@ -329,7 +337,7 @@ void test_parse_create_task_with_review_and_print() {
     // A lone create_task now decodes (renders standalone) instead of forcing blind signing.
     assert(print_agenc_info(&create_info, NULL) == 0);
 
-    uint8_t configure_accounts[] = {0, 4, 5, 2, 6, SYSTEM_INDEX};
+    uint8_t configure_accounts[] = {0, 4, 5, 2, 3, 6, SYSTEM_INDEX};
     uint8_t configure_data[] = {
         0x0b, 0x4f, 0x13, 0xbc, 0x0d, 0x20, 0xf4, 0x5a,  // discriminator
         0x01,                                            // mode
@@ -369,7 +377,11 @@ void test_process_create_task_with_review_message() {
     memcpy(&pubkeys[MESSAGE_PROGRAM_INDEX], &agenc_mainnet_preset_program_id, PUBKEY_SIZE);
 
     Hash blockhash = {{BYTES32_BS58_8}};
-    uint8_t create_accounts[] = {0, 1, 2, 3, 4, 6, 6, MESSAGE_SYSTEM_INDEX};
+    uint8_t create_accounts[] = {
+        0, 1, 2, 3, 4, 6, 6, MESSAGE_SYSTEM_INDEX,
+        MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX,
+        MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX,
+    };
     uint8_t create_data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
         BYTES32_BS58_2,                                   // task_id
@@ -388,7 +400,7 @@ void test_process_create_task_with_review_message() {
         0x05, 0x00,                                      // min_reputation
         0x00,                                            // reward_mint none
     };
-    uint8_t configure_accounts[] = {0, 4, 5, 2, 6, MESSAGE_SYSTEM_INDEX};
+    uint8_t configure_accounts[] = {0, 4, 5, 2, 3, 6, MESSAGE_SYSTEM_INDEX};
     uint8_t configure_data[] = {
         0x0b, 0x4f, 0x13, 0xbc, 0x0d, 0x20, 0xf4, 0x5a,  // discriminator
         0x01,                                            // mode
@@ -444,7 +456,9 @@ void test_parse_set_task_job_spec() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {2, 0, 3, 4, 5, 6, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        2, 0, 3, 4, AGENC_PROGRAM_INDEX, 5, 6, 7, SYSTEM_INDEX,
+    };
     uint8_t data[] = {
         0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1,  // discriminator
         BYTES32_BS58_3,                                   // job_spec_hash
@@ -477,7 +491,7 @@ void test_parse_claim_task() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, SYSTEM_INDEX};
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX};
     uint8_t data[] = {0xe6, 0x28, 0x6b, 0x6d, 0xd0, 0xe4, 0xaf, 0x1f};
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -491,9 +505,12 @@ void test_parse_claim_task() {
     assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
     assert(info.kind == AgencInstructionClaimTaskWithJobSpec);
     assert(info.claim_task_with_job_spec.task == &pubkeys[0]);
-    assert(info.claim_task_with_job_spec.claim == &pubkeys[2]);
-    assert(info.claim_task_with_job_spec.worker == &pubkeys[4]);
-    assert(info.claim_task_with_job_spec.authority == &pubkeys[5]);
+    assert(info.claim_task_with_job_spec.hire_record == &pubkeys[2]);
+    assert(info.claim_task_with_job_spec.legacy_listing == &pubkeys[3]);
+    assert(info.claim_task_with_job_spec.moderation_block == &pubkeys[4]);
+    assert(info.claim_task_with_job_spec.claim == &pubkeys[5]);
+    assert(info.claim_task_with_job_spec.worker == &pubkeys[7]);
+    assert(info.claim_task_with_job_spec.authority == &pubkeys[8]);
 
     transaction_summary_reset();
     assert(print_agenc_info(&info, NULL) == 0);
@@ -588,7 +605,11 @@ void test_parse_accept_task_result_marks_reward_unknown() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, SYSTEM_INDEX,
+    };
     uint8_t data[] = {0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -615,7 +636,7 @@ void test_parse_reject_task_result() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7};
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX, 9};
     uint8_t data[] = {
         0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6,  // discriminator
         BYTES32_BS58_6,                                   // rejection_hash
@@ -644,7 +665,12 @@ void test_parse_cancel_task_with_remaining_worker_accounts() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {0, 1, 2, 3, SYSTEM_INDEX, 4, 5, 6, 7, 8, 9};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
+        0, 1, 6,
+    };
     uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -657,14 +683,14 @@ void test_parse_cancel_task_with_remaining_worker_accounts() {
     AgencInfo info;
     assert(parse_agenc_instructions(&instruction, &header, &info) == 0);
     assert(info.kind == AgencInstructionCancelTask);
-    assert(info.cancel_task.worker_account_count == 2);
+    assert(info.cancel_task.worker_account_count == 1);
 
     transaction_summary_reset();
     assert(print_agenc_info(&info, NULL) == 0);
     assert_summary_count(7);
     assert_display(0, "AgenC action", "Cancel task");
     assert_display(1, "Refund", "not in tx");
-    assert_display(5, "Worker claims", "2");
+    assert_display(5, "Worker claims", "1");
 }
 
 void test_parse_expire_claim_with_submission() {
@@ -672,7 +698,7 @@ void test_parse_expire_claim_with_submission() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 1);
 
-    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 5, 7, 8, SYSTEM_INDEX};
+    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 5, 7, 8, 9, 1, 2, 3, SYSTEM_INDEX};
     uint8_t data[] = {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -702,7 +728,9 @@ void test_parse_expire_claim_with_submission() {
 }
 
 void test_process_set_task_job_spec_message() {
-    uint8_t accounts[] = {2, 0, 3, 4, 5, 6, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        2, 0, 3, 4, AGENC_PROGRAM_INDEX, 5, 6, 7, SYSTEM_INDEX,
+    };
     uint8_t data[] = {
         0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1,
         BYTES32_BS58_3,
@@ -717,7 +745,7 @@ void test_process_set_task_job_spec_message() {
 }
 
 void test_process_claim_task_message() {
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, SYSTEM_INDEX};
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX};
     uint8_t data[] = {0xe6, 0x28, 0x6b, 0x6d, 0xd0, 0xe4, 0xaf, 0x1f};
 
     TestMessageBuilder builder = {0};
@@ -742,7 +770,11 @@ void test_process_submit_task_result_message() {
 }
 
 void test_process_accept_task_result_message() {
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, SYSTEM_INDEX,
+    };
     uint8_t data[] = {0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
 
     TestMessageBuilder builder = {0};
@@ -752,7 +784,7 @@ void test_process_accept_task_result_message() {
 }
 
 void test_process_reject_task_result_message() {
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7};
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX, 9};
     uint8_t data[] = {
         0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6,
         BYTES32_BS58_6,
@@ -764,23 +796,28 @@ void test_process_reject_task_result_message() {
 }
 
 void test_process_cancel_task_message() {
-    uint8_t accounts[] = {0, 1, 2, 3, SYSTEM_INDEX, 4, 5, 6, 7, 8, 9};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
+        0, 1, 6,
+    };
     uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
 
     TestMessageBuilder builder = {0};
     build_single_agenc_message(&builder, accounts, ARRAY_LEN(accounts), data, ARRAY_LEN(data));
     assert_process_agenc_message(&builder, 8, "Cancel task");
     assert_display(1, "Refund", "not in tx");
-    assert_display(5, "Worker claims", "2");
+    assert_display(5, "Worker claims", "1");
 }
 
 void test_process_expire_claim_message() {
-    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 8, SYSTEM_INDEX};
+    uint8_t accounts[] = {6, 0, 1, 2, 3, 4, 5, 7, 8, 9, 1, 2, 3, SYSTEM_INDEX};
     uint8_t data[] = {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
 
     TestMessageBuilder builder = {0};
     build_single_agenc_message(&builder, accounts, ARRAY_LEN(accounts), data, ARRAY_LEN(data));
-    assert_process_agenc_message(&builder, 8, "Expire claim");
+    assert_process_agenc_message(&builder, 10, "Expire claim");
 }
 
 void test_process_compute_budget_create_task_with_review_message() {
@@ -813,7 +850,11 @@ void test_process_compute_budget_create_task_with_review_message() {
 }
 
 void test_process_lone_create_task_message() {
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+    };
     uint8_t data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
         BYTES32_BS58_2,
@@ -902,7 +943,11 @@ void test_reject_create_task_non_commitment_description() {
     init_pubkeys(pubkeys);
     MessageHeader header = test_header(pubkeys, 2);
 
-    uint8_t accounts[] = {0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX};
+    uint8_t accounts[] = {
+        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+    };
     uint8_t data[] = {
         0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
         BYTES32_BS58_2,                                   // task_id
@@ -990,6 +1035,52 @@ void test_reject_malformed_cancel_worker_accounts() {
     assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
 }
 
+void test_reject_ambiguous_cancel_suffix() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    // Two trailing triples can mean two workers or one worker plus the three
+    // BidExclusive settlement accounts. Without Task state the device cannot
+    // label that safely, so clear signing must fail closed.
+    uint8_t accounts[] = {
+        0, 1, 2, 3, SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
+        0, 1, 2, 3, 4, 5,
+    };
+    uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
+}
+
+void test_reject_revision4_claim_shape() {
+    Pubkey pubkeys[12];
+    init_pubkeys(pubkeys);
+    MessageHeader header = test_header(pubkeys, 1);
+
+    uint8_t accounts[] = {0, 1, 2, 3, 4, 5, SYSTEM_INDEX};
+    uint8_t data[] = {0xe6, 0x28, 0x6b, 0x6d, 0xd0, 0xe4, 0xaf, 0x1f};
+    Instruction instruction = {
+        AGENC_PROGRAM_INDEX,
+        accounts,
+        ARRAY_LEN(accounts),
+        data,
+        ARRAY_LEN(data),
+    };
+
+    AgencInfo info;
+    assert(parse_agenc_instructions(&instruction, &header, &info) != 0);
+}
+
 void test_reject_malformed_expire_claim_accounts() {
     Pubkey pubkeys[12];
     init_pubkeys(pubkeys);
@@ -1038,6 +1129,8 @@ int main() {
     RUN_TEST(test_reject_unknown_program_id_message);
     RUN_TEST(test_reject_malformed_cancel_task_message);
     RUN_TEST(test_reject_malformed_cancel_worker_accounts);
+    RUN_TEST(test_reject_ambiguous_cancel_suffix);
+    RUN_TEST(test_reject_revision4_claim_shape);
     RUN_TEST(test_reject_malformed_expire_claim_accounts);
 
     printf("passed\n");

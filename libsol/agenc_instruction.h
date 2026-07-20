@@ -84,6 +84,7 @@ typedef struct AgencConfigureTaskValidationInfo {
     const Pubkey *task_validation_config;
     const Pubkey *task_attestor_config;
     const Pubkey *protocol_config;
+    const Pubkey *hire_record;
     const Pubkey *creator;
     const Pubkey *system_program;
 
@@ -98,6 +99,8 @@ typedef struct AgencSetTaskJobSpecInfo {
     const Pubkey *task;
     const Pubkey *moderation_config;
     const Pubkey *task_moderation;
+    const Pubkey *moderation_attestor;
+    const Pubkey *moderation_block;
     const Pubkey *task_job_spec;
     const Pubkey *creator;
     const Pubkey *system_program;
@@ -109,6 +112,9 @@ typedef struct AgencSetTaskJobSpecInfo {
 typedef struct AgencClaimTaskWithJobSpecInfo {
     const Pubkey *task;
     const Pubkey *task_job_spec;
+    const Pubkey *hire_record;
+    const Pubkey *legacy_listing;
+    const Pubkey *moderation_block;
     const Pubkey *claim;
     const Pubkey *protocol_config;
     const Pubkey *worker;
@@ -144,6 +150,11 @@ typedef struct AgencAcceptTaskResultInfo {
     const Pubkey *treasury;
     const Pubkey *creator;
     const Pubkey *worker_authority;
+    const Pubkey *hire_record;
+    const Pubkey *operator;
+    const Pubkey *referrer;
+    const Pubkey *creator_completion_bond;
+    const Pubkey *worker_completion_bond;
     const Pubkey *system_program;
 } AgencAcceptTaskResultInfo;
 
@@ -156,6 +167,9 @@ typedef struct AgencRejectTaskResultInfo {
     const Pubkey *protocol_config;
     const Pubkey *creator;
     const Pubkey *worker_authority;
+    const Pubkey *agent_stats;
+    const Pubkey *system_program;
+    const Pubkey *worker_completion_bond;
 
     const Hash *rejection_hash;
 } AgencRejectTaskResultInfo;
@@ -179,6 +193,10 @@ typedef struct AgencExpireClaimInfo {
     const Pubkey *task_validation_config;
     const Pubkey *task_submission;
     const Pubkey *rent_recipient;
+    const Pubkey *worker_completion_bond;
+    const Pubkey *bond_creator;
+    const Pubkey *agent_stats;
+    const Pubkey *treasury;
     const Pubkey *system_program;
 } AgencExpireClaimInfo;
 

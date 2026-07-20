@@ -14,17 +14,16 @@
 #define AGENC_ARTIFACT_RESULT_B64_SIZE    43
 
 #define AGENC_REGISTER_AGENT_ACCOUNTS             4
-#define AGENC_CREATE_TASK_ACCOUNTS               8
-#define AGENC_CONFIGURE_TASK_VALIDATION_ACCOUNTS 6
-#define AGENC_SET_TASK_JOB_SPEC_ACCOUNTS         7
-#define AGENC_CLAIM_TASK_WITH_JOB_SPEC_ACCOUNTS  7
+#define AGENC_CREATE_TASK_ACCOUNTS               13
+#define AGENC_CONFIGURE_TASK_VALIDATION_ACCOUNTS 7
+#define AGENC_SET_TASK_JOB_SPEC_ACCOUNTS         9
+#define AGENC_CLAIM_TASK_WITH_JOB_SPEC_ACCOUNTS  10
 #define AGENC_SUBMIT_TASK_RESULT_ACCOUNTS        8
-#define AGENC_ACCEPT_TASK_RESULT_ACCOUNTS        11
-#define AGENC_REJECT_TASK_RESULT_ACCOUNTS        8
-#define AGENC_CANCEL_TASK_BASE_ACCOUNTS          5
+#define AGENC_ACCEPT_TASK_RESULT_ACCOUNTS        21
+#define AGENC_REJECT_TASK_RESULT_ACCOUNTS        11
+#define AGENC_CANCEL_TASK_BASE_ACCOUNTS          15
 #define AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE  3
-#define AGENC_EXPIRE_CLAIM_MIN_ACCOUNTS          8
-#define AGENC_EXPIRE_CLAIM_MAX_ACCOUNTS          10
+#define AGENC_EXPIRE_CLAIM_ACCOUNTS              14
 
 const Pubkey agenc_artifact_program_id = {{PROGRAM_ID_AGENC_ARTIFACT}};
 const Pubkey agenc_mainnet_preset_program_id = {{PROGRAM_ID_AGENC_MAINNET_PRESET}};
@@ -283,8 +282,9 @@ static int parse_configure_task_validation(Parser *parser,
     BAIL_IF(account_at(instruction, header, 1, &info->task_validation_config));
     BAIL_IF(account_at(instruction, header, 2, &info->task_attestor_config));
     BAIL_IF(account_at(instruction, header, 3, &info->protocol_config));
-    BAIL_IF(account_at(instruction, header, 4, &info->creator));
-    BAIL_IF(account_at(instruction, header, 5, &info->system_program));
+    BAIL_IF(account_at(instruction, header, 4, &info->hire_record));
+    BAIL_IF(account_at(instruction, header, 5, &info->creator));
+    BAIL_IF(account_at(instruction, header, 6, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
 
     BAIL_IF(parse_u8(parser, &info->mode));
@@ -303,9 +303,11 @@ static int parse_set_task_job_spec(Parser *parser,
     BAIL_IF(account_at(instruction, header, 1, &info->task));
     BAIL_IF(account_at(instruction, header, 2, &info->moderation_config));
     BAIL_IF(account_at(instruction, header, 3, &info->task_moderation));
-    BAIL_IF(account_at(instruction, header, 4, &info->task_job_spec));
-    BAIL_IF(account_at(instruction, header, 5, &info->creator));
-    BAIL_IF(account_at(instruction, header, 6, &info->system_program));
+    BAIL_IF(account_at(instruction, header, 4, &info->moderation_attestor));
+    BAIL_IF(account_at(instruction, header, 5, &info->moderation_block));
+    BAIL_IF(account_at(instruction, header, 6, &info->task_job_spec));
+    BAIL_IF(account_at(instruction, header, 7, &info->creator));
+    BAIL_IF(account_at(instruction, header, 8, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
 
     BAIL_IF(parse_hash_ref(parser, &info->job_spec_hash));
@@ -319,11 +321,14 @@ static int parse_claim_task_with_job_spec(const Instruction *instruction,
     BAIL_IF(instruction->accounts_length != AGENC_CLAIM_TASK_WITH_JOB_SPEC_ACCOUNTS);
     BAIL_IF(account_at(instruction, header, 0, &info->task));
     BAIL_IF(account_at(instruction, header, 1, &info->task_job_spec));
-    BAIL_IF(account_at(instruction, header, 2, &info->claim));
-    BAIL_IF(account_at(instruction, header, 3, &info->protocol_config));
-    BAIL_IF(account_at(instruction, header, 4, &info->worker));
-    BAIL_IF(account_at(instruction, header, 5, &info->authority));
-    BAIL_IF(account_at(instruction, header, 6, &info->system_program));
+    BAIL_IF(account_at(instruction, header, 2, &info->hire_record));
+    BAIL_IF(account_at(instruction, header, 3, &info->legacy_listing));
+    BAIL_IF(account_at(instruction, header, 4, &info->moderation_block));
+    BAIL_IF(account_at(instruction, header, 5, &info->claim));
+    BAIL_IF(account_at(instruction, header, 6, &info->protocol_config));
+    BAIL_IF(account_at(instruction, header, 7, &info->worker));
+    BAIL_IF(account_at(instruction, header, 8, &info->authority));
+    BAIL_IF(account_at(instruction, header, 9, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
     return 0;
 }
@@ -365,7 +370,12 @@ static int parse_accept_task_result(const Instruction *instruction,
     BAIL_IF(account_at(instruction, header, 7, &info->treasury));
     BAIL_IF(account_at(instruction, header, 8, &info->creator));
     BAIL_IF(account_at(instruction, header, 9, &info->worker_authority));
-    BAIL_IF(account_at(instruction, header, 10, &info->system_program));
+    BAIL_IF(account_at(instruction, header, 10, &info->hire_record));
+    BAIL_IF(account_at(instruction, header, 11, &info->operator));
+    BAIL_IF(account_at(instruction, header, 12, &info->referrer));
+    BAIL_IF(account_at(instruction, header, 13, &info->creator_completion_bond));
+    BAIL_IF(account_at(instruction, header, 14, &info->worker_completion_bond));
+    BAIL_IF(account_at(instruction, header, 20, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
     return 0;
 }
@@ -383,6 +393,10 @@ static int parse_reject_task_result(Parser *parser,
     BAIL_IF(account_at(instruction, header, 5, &info->protocol_config));
     BAIL_IF(account_at(instruction, header, 6, &info->creator));
     BAIL_IF(account_at(instruction, header, 7, &info->worker_authority));
+    BAIL_IF(account_at(instruction, header, 8, &info->agent_stats));
+    BAIL_IF(account_at(instruction, header, 9, &info->system_program));
+    BAIL_IF(account_at(instruction, header, 10, &info->worker_completion_bond));
+    BAIL_IF(validate_system_program(info->system_program));
 
     BAIL_IF(parse_hash_ref(parser, &info->rejection_hash));
     return 0;
@@ -392,6 +406,11 @@ static int parse_cancel_task(const Instruction *instruction,
                              const MessageHeader *header,
                              AgencCancelTaskInfo *info) {
     BAIL_IF(instruction->accounts_length < AGENC_CANCEL_TASK_BASE_ACCOUNTS);
+    // Clear-sign only the independent, non-bid one-shot shape (zero or one
+    // worker triple). Larger suffixes are ambiguous without reading Task state:
+    // a BidExclusive suffix can otherwise be mislabeled as worker claims.
+    BAIL_IF(instruction->accounts_length >
+            AGENC_CANCEL_TASK_BASE_ACCOUNTS + AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE);
     BAIL_IF(((instruction->accounts_length - AGENC_CANCEL_TASK_BASE_ACCOUNTS) %
              AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE) != 0);
     BAIL_IF(account_at(instruction, header, 0, &info->task));
@@ -409,8 +428,9 @@ static int parse_cancel_task(const Instruction *instruction,
 static int parse_expire_claim(const Instruction *instruction,
                               const MessageHeader *header,
                               AgencExpireClaimInfo *info) {
-    BAIL_IF(instruction->accounts_length < AGENC_EXPIRE_CLAIM_MIN_ACCOUNTS);
-    BAIL_IF(instruction->accounts_length > AGENC_EXPIRE_CLAIM_MAX_ACCOUNTS);
+    // Parent/bid remaining-account suffixes require task-state context and are
+    // deliberately left to blind signing instead of being mislabeled.
+    BAIL_IF(instruction->accounts_length != AGENC_EXPIRE_CLAIM_ACCOUNTS);
     BAIL_IF(account_at(instruction, header, 0, &info->authority));
     BAIL_IF(account_at(instruction, header, 1, &info->task));
     BAIL_IF(account_at(instruction, header, 2, &info->escrow));
@@ -418,18 +438,14 @@ static int parse_expire_claim(const Instruction *instruction,
     BAIL_IF(account_at(instruction, header, 4, &info->worker));
     BAIL_IF(account_at(instruction, header, 5, &info->protocol_config));
 
-    size_t tail_index = 6;
-    if (instruction->accounts_length == 9 || instruction->accounts_length == 10) {
-        BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->task_validation_config));
-        tail_index += 1;
-    }
-    if (instruction->accounts_length == 10) {
-        BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->task_submission));
-        tail_index += 1;
-    }
-
-    BAIL_IF(account_at(instruction, header, (uint8_t) tail_index, &info->rent_recipient));
-    BAIL_IF(account_at(instruction, header, (uint8_t) (tail_index + 1), &info->system_program));
+    BAIL_IF(account_at(instruction, header, 6, &info->task_validation_config));
+    BAIL_IF(account_at(instruction, header, 7, &info->task_submission));
+    BAIL_IF(account_at(instruction, header, 8, &info->rent_recipient));
+    BAIL_IF(account_at(instruction, header, 9, &info->worker_completion_bond));
+    BAIL_IF(account_at(instruction, header, 10, &info->bond_creator));
+    BAIL_IF(account_at(instruction, header, 11, &info->agent_stats));
+    BAIL_IF(account_at(instruction, header, 12, &info->treasury));
+    BAIL_IF(account_at(instruction, header, 13, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
     return 0;
 }

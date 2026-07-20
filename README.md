@@ -64,8 +64,8 @@ instead.
 
 ## Clear-Signing Scope
 
-The v1 parser focuses on the AgenC marketplace actions that matter for a first
-secure-screen workflow:
+The parser is pinned to the AgenC revision-5 instruction layouts and focuses on
+the marketplace actions that matter for the secure-screen workflow:
 
 - register agent
 - create task — standalone, or as the `create_task` + `configure_task_validation`
@@ -102,6 +102,12 @@ review text.
 Some fields are intentionally shown as incomplete when they cannot be derived
 from the transaction bytes alone. For example, the app does not infer settlement
 reward or cancellation refund amounts from account state.
+
+Clear signing deliberately fails closed for account suffixes whose meaning
+requires reading Task state: dependent or BidExclusive claim/accept/expire
+flows, and cancel flows beyond one worker. Those advanced shapes remain
+available through Ledger blind signing; the independent, non-bid marketplace
+paths used by the standard storefront are clear-signed.
 
 ## Repository Layout
 
@@ -234,8 +240,8 @@ The app only displays values that are present in the signed transaction bytes.
 
 - `submit_task_result` decodes AgenC artifact result data and displays the
   artifact SHA-256 when the kit uses `artifact:sha256:*` result data.
-- `claim_task_with_job_spec` can display the task/job-spec account addresses,
-  but cannot display the job-spec hash or URI because the current protocol
+- `claim_task_with_job_spec` displays the task, worker, authority, and claim
+  accounts, but cannot display the job-spec hash or URI because the protocol
   instruction does not carry those fields in the claim instruction data.
 - `accept_task_result` and `cancel_task` cannot display reward/refund amounts
   because those values come from on-chain task/escrow state, not the current
