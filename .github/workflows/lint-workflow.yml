@@ -5,43 +5,66 @@ on:
   push:
     branches:
       - master
+      - main
       - develop
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   job_lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      image: silkeh/clang@sha256:7e05c8da417eba05234d9a5e9838f6dd7d170910082ba4e43eb915ea182e69f9 # clang-format 12.0.1, linux/amd64
 
     steps:
       - name: Clone
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-
-      - name: Lint src
-        uses: DoozyX/clang-format-lint-action@c71d0bf4e21876ebec3e5647491186f8797fde31 # v0.13
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          source: './src'
-          extensions: 'h,c'
-          clangFormatVersion: 12.0.0
+          persist-credentials: false
 
-      - name: Lint libsol
-        uses: DoozyX/clang-format-lint-action@c71d0bf4e21876ebec3e5647491186f8797fde31 # v0.13
-        with:
-          source: './libsol'
-          extensions: 'h,c'
-          clangFormatVersion: 12.0.0
+      - name: Verify immutable workflow dependencies
+        run: bash .github/scripts/check-workflow-pins.sh
+
+      - name: Check C formatting
+        shell: bash
+        run: |
+          mapfile -d '' sources < <(
+            find src libsol -type f \( -name '*.c' -o -name '*.h' \) -print0
+          )
+          if (( ${#sources[@]} == 0 )); then
+            echo "No C sources found." >&2
+            exit 1
+          fi
+          clang-format --dry-run --Werror "${sources[@]}"
 
   misspell:
     name: Check misspellings
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Clone
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Check misspellings
-        uses: codespell-project/actions-codespell@22ff5a2e4b591290baf82d47c9feadac31c65441 # v1
-        with:
-          builtin: clear,rare
-          check_filenames: true
-          path: src/,libsol/,Makefile,README.md,doc/
-          skip: ./libsol/printer_test.c
+        shell: bash
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/codespell"
+          "${RUNNER_TEMP}/codespell/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --no-cache-dir \
+            --no-deps \
+            --require-hashes \
+            'codespell @ https://files.pythonhosted.org/packages/8b/bf/bdb951d34eb169140b546f44be9ec4525d1acefb9eb5572071f5492b19fc/codespell-2.4.3-py3-none-any.whl#sha256=af2505b335e8573dbd2d384d1c4ef498f4006f4ba2d6fceca01e55b91f52628a'
+          "${RUNNER_TEMP}/codespell/bin/codespell" \
+            --builtin clear,rare \
+            --check-filenames \
+            --skip '*/printer_test.c' \
+            src/ libsol/ Makefile README.md doc/

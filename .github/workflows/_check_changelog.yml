@@ -1,0 +1,73 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Check changelog
+
+on:
+  workflow_call:
+    inputs:
+      workflows_ref:
+        description: 'The current reference in use for the ledger-app-workflow repository'
+        required: true
+        type: string
+      app_repository:
+        description: 'The URL of the app repository to check. Defaults to the workflow caller repository URL'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      is_rust:
+        description: '"true" if the app is using Rust SDK, else "false" (narrows the app version lookup)'
+        required: false
+        default: 'false'
+        type: string
+
+permissions:
+  contents: read  # Needed to clone the repositories
+
+env:
+  WORKFLOWS_REF: ${{ inputs.workflows_ref }}
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+
+jobs:
+  check_changelog:
+    name: Check changelog
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Clone ledger-app-workflows repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-app-workflows
+          path: ./ledger-app-workflows
+          ref: ${{ inputs.workflows_ref }}
+          persist-credentials: false
+
+      - name: Clone app repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          path: app-repository
+          submodules: recursive
+          # Full history is required to compute the diff between the PR base and head
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The script never fails: it computes a verdict (ok / soft / hard / skip), prints a
+      # human-readable status, fills the job summary and emits warning/error annotations.
+      - name: Check changelog
+        id: check
+        env:
+          IS_RUST: ${{ inputs.is_rust }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+            ./ledger-app-workflows/scripts/check_changelog.sh \
+              ./app-repository \
+              "${PR_BASE_SHA}" \
+              "${PR_HEAD_SHA}"
+
+      # A version bump that is not documented in the CHANGELOG is a blocking error.
+      - name: Fail when the version changed without a CHANGELOG update
+        if: steps.check.outputs.verdict == 'hard'
+        run: |
+            echo "The application version was changed but the CHANGELOG was not updated."
+            exit 1

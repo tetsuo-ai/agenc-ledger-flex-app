@@ -1,0 +1,648 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+---
+name: Functional tests using Ragger
+
+on:
+  workflow_call:
+    inputs:
+      app_repository:
+        description: 'The GIT repository to test (defaults to `github.repository`)'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      app_branch_name:
+        description: 'The immutable GIT revision to test (defaults to `github.sha`)'
+        required: false
+        default: ${{ github.sha }}
+        type: string
+      base_branch_name:
+        description: 'Branch targeted by an optional snapshot-update pull request'
+        required: false
+        default: ${{ github.ref_name }}
+        type: string
+      test_dir:
+        description: |
+          The directory where the Python tests are stored (a `conftest.py` file is expected there).
+
+          If the application is configured with a 'ledger_app.toml' file at its root containing a
+          `test.pytest_directory` field, this parameter is ignored.
+          If this parameter is defined neither as a workflow input nor in the manifest file, the
+          workflow will output an error.
+        required: false
+        default: 'None'
+        type: string
+      download_app_binaries_artifact:
+        description: 'The name of the artifact containing the application binary file(s) to be tested. Required'
+        required: true
+        type: string
+      additional_app_binaries_artifact:
+        description: 'The name of the artifact containing the additional app binary file(s), if needed by the application to be tested (defaults to empty string)'
+        required: false
+        default: ''
+        type: string
+      additional_app_binaries_artifact_dir:
+        description: 'The directory where the additional app binaries will be downloaded (defaults to ".")'
+        required: false
+        default: '.'
+        type: string
+      lib_binaries_artifact:
+        description: 'The name of the artifact containing the library binary file(s), if needed by the application to be tested (defaults to empty string)'
+        required: false
+        default: ''
+        type: string
+      lib_binaries_artifact_dir:
+        description: 'The directory where the additional lib binaries will be downloaded (defaults to ".")'
+        required: false
+        default: '.'
+        type: string
+      run_for_devices:
+        description: |
+          The list of device(s) on which the test will run.
+
+          Defaults to the full list of device(s) supported by the application as configured in the
+          'ledger_app.toml' manifest.
+          If the manifest is missing, defaults to ALL (["nanos", "nanox", "nanosp", "stax", "flex", "apex_m", "apex_p"]).
+        required: false
+        default: 'None'
+        type: string
+      upload_snapshots_on_failure:
+        description: 'Enable or disable upload of tests snapshots if the job fails (defaults to true).'
+        required: false
+        default: true
+        type: boolean
+      test_filter:
+        description: 'Specify an expression which implements a substring match on the test names'
+        required: false
+        default: '""'
+        type: string
+      test_options:
+        description: 'Specify optional parameters to be passed to the running test'
+        required: false
+        default: ''
+        type: string
+      regenerate_snapshots:
+        description: 'Clean snapshots, regenerate them, commit the changes in a branch, and open a PR'
+        required: false
+        default: false
+        type: boolean
+      also_delete_snapshots:
+        description: |
+          Only relevant when `regenerate_snapshots == true`.
+
+          When true, the existing snapshots directory is wiped before the freshly generated
+          snapshots are laid down in the PR.
+        required: false
+        default: false
+        type: boolean
+      capture_file:
+        description: 'Optional file name to capture pytest logs into an artifact'
+        required: false
+        default: ''
+        type: string
+      post_stack_consumption:
+        description: "Whether to publish a stack consumption job summary on PRs (defaults to false).
+                     Requires `reusable_build.yml` to be configured with `enable_stack_consumption == true`."
+        required: false
+        default: false
+        type: boolean
+      stack_consumption_section_id:
+        description: "Safe identifier used to namespace stack-consumption artifacts and headings."
+        required: false
+        default: 'stack-consumption-summary'
+        type: string
+      coverage:
+        description: "Collect firmware C coverage: trace the app inside Speculos/QEMU and upload an
+                     lcov file (+ HTML report) as artifacts ('coverage-<device>'). Requires a ragger
+                     version providing the `--coverage` option, an app built with debug symbols, and
+                     installs the 'lcov' package on the runner."
+        required: false
+        default: false
+        type: boolean
+      coverage_exclude:
+        description: "Comma-separated source paths to exclude from coverage (e.g. a vendored
+                     submodule like 'ethereum-plugin-sdk'). Only used when `coverage: true`."
+        required: false
+        default: ''
+        type: string
+    secrets:
+      secret_test_options:
+        description: 'A string of secret options to be given to `pytest`'
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  APP_BRANCH_NAME: ${{ inputs.app_branch_name }}
+  TEST_DIR: ${{ inputs.test_dir }}
+  DOWNLOAD_APP_BINARIES_ARTIFACT: ${{ inputs.download_app_binaries_artifact }}
+  ADDITIONAL_APP_BINARIES_ARTIFACT: ${{ inputs.additional_app_binaries_artifact }}
+  ADDITIONAL_APP_BINARIES_ARTIFACT_DIR: ${{ inputs.additional_app_binaries_artifact_dir }}
+  LIB_BINARIES_ARTIFACT: ${{ inputs.lib_binaries_artifact }}
+  LIB_BINARIES_ARTIFACT_DIR: ${{ inputs.lib_binaries_artifact_dir }}
+  RUN_FOR_DEVICES: ${{ inputs.run_for_devices }}
+  UPLOAD_SNAPSHOTS_ON_FAILURE: ${{ inputs.upload_snapshots_on_failure }}
+  TEST_FILTER: ${{ inputs.test_filter }}
+  TEST_OPTIONS: ${{ inputs.test_options }}
+  REGENERATE_SNAPSHOTS: ${{ inputs.regenerate_snapshots }}
+  ALSO_DELETE_SNAPSHOTS: ${{ inputs.also_delete_snapshots }}
+  CAPTURE_FILE: ${{ inputs.capture_file }}
+  POST_STACK_CONSUMPTION: ${{ inputs.post_stack_consumption }}
+  COVERAGE: ${{ inputs.coverage }}
+  COVERAGE_EXCLUDE: ${{ inputs.coverage_exclude }}
+
+jobs:
+  call_get_app_metadata:
+    # This job digests inputs and repository metadata provided by the `ledger_app.toml` manifest
+    # file, in order to output relevant directories, compatible devices, and other variables needed
+    # by following jobs.
+    name: Retrieve application metadata
+    uses: ./.github/workflows/_get_app_metadata.yml
+    with:
+      app_repository: ${{ inputs.app_repository }}
+      app_branch_name: ${{ inputs.app_branch_name }}
+      compatible_devices: ${{ inputs.run_for_devices }}
+
+  call_get_test_metadata:
+    name: Retrieve test metadata
+    uses: ./.github/workflows/_get_test_metadata.yml
+    with:
+      app_repository: ${{ inputs.app_repository }}
+      app_branch_name: ${{ inputs.app_branch_name }}
+      pytest_directory: ${{ inputs.test_dir }}
+
+  ragger_tests:
+    name: Functional tests with Ragger
+    needs: [call_get_app_metadata, call_get_test_metadata]
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(needs.call_get_app_metadata.outputs.compatible_devices) }}
+    runs-on: ubuntu-24.04
+    # Deliberately run on the hosted runner. Caller-controlled container tags are not accepted.
+
+    steps:
+      - name: Check metadata
+        if: ${{ needs.call_get_test_metadata.outputs.pytest_directory == 'None' }}
+        run: |
+          echo "ERROR: This workflow either needs a 'ledger_app.toml' manifest with a 'tests.pytest_directory' section, or be configured with a valid 'test_dir' parameter"
+          exit 1
+
+      - name: Clone
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          ref: ${{ inputs.app_branch_name }}
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set binary path
+        id: "set_binary_path"
+        run: |
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+              echo "Set Rust binary path"
+              cd ${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}
+              binary_path=$(cargo metadata --no-deps --format-version 1 | jq -r '.target_directory')
+              echo "binary_path=${binary_path}" >> "${GITHUB_OUTPUT}"
+          else
+              echo "binary_path=${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build" >> "${GITHUB_OUTPUT}"
+          fi
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+
+      - name: Download app binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.download_app_binaries_artifact }}
+          path: ${{ steps.set_binary_path.outputs.binary_path }}
+
+      - name: Display structure of downloaded files
+        run: ls -1 ${STEPS_SET_BINARY_PATH_OUTPUTS_BINARY_PATH}
+        env:
+          STEPS_SET_BINARY_PATH_OUTPUTS_BINARY_PATH: ${{ steps.set_binary_path.outputs.binary_path }}
+
+      - name: Download additional app binaries if required
+        if: ${{ inputs.additional_app_binaries_artifact != '' }}
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.additional_app_binaries_artifact }}
+          path: ${{ inputs.additional_app_binaries_artifact_dir }}
+
+      - name: Display structure of downloaded files
+        if: ${{ inputs.additional_app_binaries_artifact != '' }}
+        run: ls -1 ${ADDITIONAL_APP_BINARIES_ARTIFACT_DIR}
+
+      - name: Download additional lib binaries if required
+        if: ${{ inputs.lib_binaries_artifact != '' }}
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.lib_binaries_artifact }}
+          path: ${{ inputs.lib_binaries_artifact_dir }}
+
+      - name: Display structure of downloaded files
+        if: ${{ inputs.lib_binaries_artifact != '' }}
+        run: ls -1 ${LIB_BINARIES_ARTIFACT_DIR}
+
+      - name: Checkout ledger-app-workflows
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-app-workflows
+          path: ./ledger-app-workflows
+          ref: adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a
+          persist-credentials: false
+
+      - name: Install system dependencies
+        run: ./ledger-app-workflows/scripts/apt_install.sh qemu-user-static
+
+      - name: Install coverage system dependencies
+        if: ${{ inputs.coverage }}
+        run: ./ledger-app-workflows/scripts/apt_install.sh -n lcov gpg
+
+      - name: Install tests dependencies
+        shell: bash
+        run: |
+          workspace=$(realpath -m -- "${GITHUB_WORKSPACE}")
+          test_directory=$(realpath -m -- "${NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY}")
+          case "${test_directory}" in
+            "${workspace}"/*) ;;
+            *)
+              echo "Test directory must stay inside the checked-out workspace." >&2
+              exit 1
+              ;;
+          esac
+
+          requirements_lock="${test_directory}/requirements-ci.txt"
+          if [ ! -f "${requirements_lock}" ]; then
+            echo "Missing hash-locked test requirements: ${requirements_lock}" >&2
+            exit 1
+          fi
+
+          python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+          if [ "${python_version}" != "3.12" ]; then
+            echo "The functional-test lock requires Python 3.12, found ${python_version}." >&2
+            exit 1
+          fi
+
+          venv="${RUNNER_TEMP}/ragger-venv"
+          python3 -m venv "${venv}"
+          "${venv}/bin/python" -m pip install --disable-pip-version-check --no-deps \
+            'setuptools @ https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl#sha256=062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922' \
+            'wheel @ https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl#sha256=708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248' \
+            'packaging @ https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl#sha256=5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e'
+          "${venv}/bin/python" -m pip install --disable-pip-version-check \
+            --require-hashes --no-build-isolation -r "${requirements_lock}"
+          echo "${venv}/bin" >> "${GITHUB_PATH}"
+          export PATH="${venv}/bin:${PATH}"
+
+          setup_script="${test_directory}/setup_script.sh"
+          if [ -f "${setup_script}" ]; then
+            bash -- "${setup_script}"
+          fi
+        env:
+          NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY: ${{ needs.call_get_test_metadata.outputs.pytest_directory }}
+
+      - name: Run test
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+          PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+          SECRET_TEST_OPTIONS: ${{ secrets.secret_test_options }}
+          NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY: ${{ needs.call_get_test_metadata.outputs.pytest_directory }}
+          MATRIX_DEVICE: ${{ matrix.device }}
+        shell: bash
+        run: |
+          PYTEST_ARGS=("${NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY}")
+          PYTEST_ARGS+=(--tb=short -v "--device=${MATRIX_DEVICE}")
+
+          if [ "${POST_STACK_CONSUMPTION}" = "true" ]; then
+            PYTEST_ARGS+=(--get-stack-consumption)
+          fi
+
+          if [ "${COVERAGE}" = "true" ]; then
+            # Use the `--opt=value` form (not `--opt value`): pytest resolves its
+            # rootdir before plugin options are registered, and at that point any
+            # bare token not starting with `-` is treated as a test path. A value
+            # that happens to be a real directory (e.g. COVERAGE_EXCLUDE pointing
+            # a submodule at the repo root) would then drag the rootdir up to the
+            # repo root, breaking ragger's snapshot path resolution.
+            # The `=` form keeps the value attached to the `-` token.
+            PYTEST_ARGS+=(--coverage "--coverage_output=coverage-${MATRIX_DEVICE}.info")
+            if [ -n "${COVERAGE_EXCLUDE}" ]; then
+              PYTEST_ARGS+=("--coverage_exclude=${COVERAGE_EXCLUDE}")
+            fi
+          fi
+
+          if [ -n "${TEST_FILTER}" ] && [ "${TEST_FILTER}" != '""' ]; then
+            # Remove leading and trailing quotes from the filter if they exist
+            TRIMMED_FILTER="${TEST_FILTER%\"}"
+            TRIMMED_FILTER="${TRIMMED_FILTER#\"}"
+            PYTEST_ARGS+=(-k "${TRIMMED_FILTER}")
+          fi
+
+          if [ "${REGENERATE_SNAPSHOTS}" = "true" ]; then
+            PYTEST_ARGS+=(--golden_run)
+          fi
+
+          if [ -n "${TEST_OPTIONS}" ]; then
+            read -r -a TEST_OPTION_ARGS <<< "${TEST_OPTIONS}"
+            PYTEST_ARGS+=("${TEST_OPTION_ARGS[@]}")
+          fi
+
+          if [ -n "${SECRET_TEST_OPTIONS}" ]; then
+            # GitHub's auto-mask covers the composite secret_test_options
+            # string as a whole. After bash word-splits it for argv, the
+            # individual values (token, email, ...) become substrings that
+            # no longer match the mask, so any subsequent log line that
+            # echoes them would leak. Re-register each non-flag token
+            # under ::add-mask:: before adding to argv.
+            read -r -a SECRET_TOKENS <<< "${SECRET_TEST_OPTIONS}"
+            for tok in "${SECRET_TOKENS[@]}"; do
+              [[ -z "${tok}" || "${tok}" == --* ]] && continue
+              echo "::add-mask::${tok}"
+            done
+            PYTEST_ARGS+=("${SECRET_TOKENS[@]}")
+          fi
+
+          echo "Running pytest with arguments: ${PYTEST_ARGS[*]}"
+
+          if [ -n "${CAPTURE_FILE}" ]; then
+            # Capture pytest output to a file
+            pytest "${PYTEST_ARGS[@]}" -s 2>&1 | tee pytest_output.log
+          else
+            pytest "${PYTEST_ARGS[@]}" 2>&1 | tee pytest_run.log
+          fi
+
+      - name: Extract stack consumption summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          LOG_FILE="pytest_output.log"
+          if [ ! -f "$LOG_FILE" ]; then
+            LOG_FILE="pytest_run.log"
+          fi
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "No pytest log found, skipping."
+            exit 0
+          fi
+          # Extract from "stack consumption summary" to the "worst case" separator
+          awk '/stack consumption summary/{found=1} found{print} /worst case:/{exit}' "$LOG_FILE" > stack_summary_${MATRIX_DEVICE}.txt
+          if [ ! -s stack_summary_${MATRIX_DEVICE}.txt ]; then
+            echo "No stack consumption data found for ${MATRIX_DEVICE}."
+            rm -f stack_summary_${MATRIX_DEVICE}.txt
+          else
+            cat stack_summary_${MATRIX_DEVICE}.txt
+            echo "| Test | Stack |" >> ${GITHUB_STEP_SUMMARY}
+            echo "|------|--------------:|" >> ${GITHUB_STEP_SUMMARY}
+
+            # print stack summary detail, worst case line printed out separately
+            tail -n +2 stack_summary_${MATRIX_DEVICE}.txt | head -n -1 |
+              sed -r -e 's/^/| /' -e 's/$/ |/' -e 's/([[:digit:]]+ bytes)\s+(\S+)/\2 | \1 |/' >> ${GITHUB_STEP_SUMMARY}
+
+            # print worst case line
+            echo "" >> ${GITHUB_STEP_SUMMARY}
+            tail -n1 stack_summary_${MATRIX_DEVICE}.txt >> ${GITHUB_STEP_SUMMARY}
+          fi
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Upload stack consumption summary
+        if: ${{ always() && hashFiles(format('stack_summary_{0}.txt', matrix.device)) != '' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.stack_consumption_section_id }}-${{ matrix.device }}
+          path: stack_summary_${{ matrix.device }}.txt
+
+      - name: Upload pytest logs
+        if: ${{ inputs.capture_file != '' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: pytest-logs-${{ matrix.device }}
+          path: pytest_output.log
+
+      - name: Upload coverage report
+        if: ${{ inputs.coverage && hashFiles(format('coverage-{0}.info', matrix.device)) != '' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: coverage-${{ matrix.device }}
+          path: |
+            coverage-${{ matrix.device }}.info
+            coverage-${{ matrix.device }}_html
+
+      - name: Set upload flag
+        id: upload-flag
+        if: ${{ (failure() && inputs.upload_snapshots_on_failure == true) || ( success() && inputs.regenerate_snapshots == true) }}
+        run: |
+          echo "artifact_uploaded=true" >> "${GITHUB_OUTPUT}"
+
+      # Compute a unique name for this upload
+      - name: Compute artifact name
+        id: compute_name
+        if: ${{ steps.upload-flag.outputs.artifact_uploaded == 'true' }}
+        shell: bash
+        run: |
+          sanitize() {
+            LC_ALL=C printf '%s' "$1" \
+              | tr '\n' ' ' \
+              | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' \
+              | tr ' ' '_' \
+              | LC_ALL=C tr -c 'A-Za-z0-9._-_' '_' \
+              | sed -E 's/_+/_/g'
+          }
+
+          safe_test_dir="$(sanitize "${NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY}")"
+          safe_test_options="$(sanitize "${TEST_OPTIONS}")"
+
+          # If options are empty, skip the dash
+          if [[ -n "${safe_test_options}" ]]; then
+            artifact_basename="tests_snapshots_${safe_test_dir}-${safe_test_options}"
+          else
+            artifact_basename="tests_snapshots_${safe_test_dir}"
+          fi
+
+          # Truncate to stay safely under the 256-char limit
+          artifact_basename="${artifact_basename:0:200}"
+
+          echo "artifact_basename=${artifact_basename}"
+          echo "artifact_basename=${artifact_basename}" >> "$GITHUB_OUTPUT"
+        env:
+          NEEDS_CALL_GET_TEST_METADATA_OUTPUTS_PYTEST_DIRECTORY: ${{ needs.call_get_test_metadata.outputs.pytest_directory }}
+
+      - name: Upload snapshots if needed
+        if: ${{ steps.upload-flag.outputs.artifact_uploaded == 'true' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          # Make the artifact name unique to allow running this job in parallel
+          # Append a ~ at the end to prevent one job's pattern from prefixing another one
+          name: ${{ steps.compute_name.outputs.artifact_basename }}~${{ matrix.device }}
+          path: ${{ needs.call_get_test_metadata.outputs.pytest_directory }}/snapshots-tmp
+
+    outputs:
+      snapshot_artifact_uploaded: ${{ steps.upload-flag.outputs.artifact_uploaded }}
+      snapshot_artifact_basename: ${{ steps.compute_name.outputs.artifact_basename }}
+
+  merge_pytest_logs:
+    name: Merge pytest logs
+    needs: ragger_tests
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.capture_file != '' }}
+    steps:
+      - name: Download pytest logs
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: pytest-logs-*
+          path: logs
+          merge-multiple: true
+
+      - name: Combine logs
+        run: |
+          find logs -name "pytest_output.log" -exec cat {} \; > "${CAPTURE_FILE}.log"
+
+      - name: Upload combined logs
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: "${{ inputs.capture_file }}"
+          path: "${{ inputs.capture_file }}.log"
+
+  merge_artifacts_if_needed:
+    # Merge matrix output
+    name: Merge snapshots artifacts
+    needs: ragger_tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Merge snapshots artifacts
+        uses: actions/upload-artifact/merge@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: ${{ needs.ragger_tests.outputs.snapshot_artifact_uploaded == 'true' }}
+        with:
+          # Merge all basename-$device.zip into a single basename.zip
+          name: ${{ needs.ragger_tests.outputs.snapshot_artifact_basename }}
+          # We pattern against the ~ set above to prevent subpatterning
+          pattern: ${{ needs.ragger_tests.outputs.snapshot_artifact_basename }}~*
+          delete-merged: true
+
+    outputs:
+      # Forward computed base name
+      snapshot_artifact_name: ${{ needs.ragger_tests.outputs.snapshot_artifact_basename }}
+
+  pr_new_snapshots:
+    name: Open a PR with the new snapshots
+    needs: [merge_artifacts_if_needed, call_get_app_metadata, call_get_test_metadata]
+    if: ${{ inputs.regenerate_snapshots == true }}
+    permissions:
+      contents: write       # Required only to push a manually requested snapshot branch.
+      pull-requests: write  # Required only to open the snapshot review pull request.
+    uses: ./.github/workflows/_open_pr_with_new_snapshots.yml
+    with:
+      app_repository: ${{ inputs.app_repository }}
+      app_branch_name: ${{ inputs.app_branch_name }}
+      base_branch_name: ${{ inputs.base_branch_name }}
+      snapshots_artifact_name: ${{ needs.merge_artifacts_if_needed.outputs.snapshot_artifact_name }}
+      snapshots_directory: ${{ needs.call_get_test_metadata.outputs.pytest_directory }}/snapshots
+      also_delete_snapshots: ${{ inputs.also_delete_snapshots }}
+
+  post_stack_consumption:
+    name: Publish stack consumption summary
+    needs: [ragger_tests, call_get_app_metadata]
+    if: ${{ always() && inputs.post_stack_consumption && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download all stack summary artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: ${{ inputs.stack_consumption_section_id }}-*
+          path: summaries
+          merge-multiple: true
+
+      - name: Download app binaries for stack reference
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.additional_app_binaries_artifact != '' && inputs.additional_app_binaries_artifact || inputs.download_app_binaries_artifact }}
+          path: app_binaries/
+
+      - name: Build stack report
+        id: build_report
+        shell: bash
+        env:
+          INPUTS_ADDITIONAL_APP_BINARIES_ARTIFACT: ${{ inputs.additional_app_binaries_artifact }}
+          IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          STACK_CONSUMPTION_SECTION_ID: ${{ inputs.stack_consumption_section_id }}
+        run: |
+          if [[ ! "${STACK_CONSUMPTION_SECTION_ID}" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
+              echo "Invalid stack-consumption section identifier." >&2
+              exit 1
+          fi
+
+          mapfile -t files < <(find summaries -type f -name 'stack_summary_*.txt' -print | sort)
+          if (( ${#files[@]} == 0 )); then
+              echo "No stack summary files found."
+              echo "has_report=false" >> "$GITHUB_OUTPUT"
+              exit 0
+          fi
+
+          echo "| Device | Worst case (bytes) | Remaining stack (bytes) | Test |" > stack_comment.md
+          echo "|--------|------------------:|------------------:|------|" >> stack_comment.md
+
+          has_data=false
+          for f in "${files[@]}"; do
+              device=$(basename "$f" | sed -n 's/^stack_summary_\(.*\)\.txt$/\1/p')
+
+              if [ -n "${INPUTS_ADDITIONAL_APP_BINARIES_ARTIFACT}" ]; then
+                # additional_app_binaries_artifact is set (e.g. app-exchange for swap tests).
+                # It is always a C SDK app, so use the C layout.
+                DEVICE_NAME="$(echo "${device}" | sed 's/nanosp/nanos2/')"
+                APP_PATH=$(find "app_binaries/${DEVICE_NAME}/bin" -type f -name '*.elf' -print -quit)
+              elif [ "${IS_RUST}" = "true" ]; then
+                DEVICE_NAME="$(echo "${device}" | sed 's/nanosp/nanosplus/')"
+                APP_PATH=$(find "app_binaries/${DEVICE_NAME}/release" -type f ! -name '*.*' -print -quit)
+              else
+                DEVICE_NAME="$(echo "${device}" | sed 's/nanosp/nanos2/')"
+                APP_PATH=$(find "app_binaries/${DEVICE_NAME}/bin" -type f -name '*.elf' -print -quit)
+              fi
+
+              if [ -z "${APP_PATH}" ]; then
+                  echo "No ELF found for ${device}." >&2
+                  exit 1
+              fi
+              estack_addr=$(nm -- "${APP_PATH}" | awk '$3 == "_estack" {print "0x"$1; exit}')
+              stack_addr=$(nm -- "${APP_PATH}" | awk '$3 == "_stack" {print "0x"$1; exit}')
+              if [[ ! "${estack_addr}" =~ ^0x[0-9A-Fa-f]+$ || ! "${stack_addr}" =~ ^0x[0-9A-Fa-f]+$ ]]; then
+                  echo "Invalid stack symbols in ${APP_PATH}." >&2
+                  exit 1
+              fi
+              max_stack_size=$((estack_addr - stack_addr))
+
+              [ -z "$device" ] && device="unknown"
+              while IFS= read -r line; do
+                  if echo "$line" | grep -iqE 'worst case:\s*[0-9]+\s+bytes'; then
+                      bytes=$(echo "$line" | sed -n 's/.*worst case:\s*\([0-9]\+\)\s\+bytes.*/\1/Ip')
+                      test_name=$(echo "$line" | sed -n 's/.*worst case:\s*[0-9]\+\s\+bytes\s*(\(.*\))/\1/Ip' | sed 's/[[:space:]]*-*$//')
+                      echo "| ${device} | ${bytes} | $((max_stack_size - bytes)) | \`${test_name}\` |" >> stack_comment.md
+                      has_data=true
+                      break
+                  fi
+              done < "$f"
+          done
+
+          if [ "$has_data" = false ]; then
+              echo "has_report=false" >> "$GITHUB_OUTPUT"
+              exit 0
+          fi
+
+          echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish stack report
+        if: ${{ steps.build_report.outputs.has_report == 'true' }}
+        shell: bash
+        env:
+          STACK_CONSUMPTION_SECTION_ID: ${{ inputs.stack_consumption_section_id }}
+        run: |
+          {
+            echo "## Stack consumption (${STACK_CONSUMPTION_SECTION_ID})"
+            echo
+            echo "> **Warning:** This summary is informational and depends on test coverage."
+            echo
+            cat stack_comment.md
+          } >> "${GITHUB_STEP_SUMMARY}"

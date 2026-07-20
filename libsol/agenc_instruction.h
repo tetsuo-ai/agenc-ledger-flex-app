@@ -9,16 +9,16 @@
 
 // Current verified AgenC mainnet program id:
 // HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
-#define PROGRAM_ID_AGENC_ARTIFACT \
-    242, 79, 6, 99, 64, 38, 134, 189, 153, 254, 99, 205, 191, 250, 117, 81, 77, \
-        182, 210, 40, 135, 198, 34, 170, 239, 78, 246, 219, 237, 68, 245, 232
+#define PROGRAM_ID_AGENC_ARTIFACT                                                                  \
+    242, 79, 6, 99, 64, 38, 134, 189, 153, 254, 99, 205, 191, 250, 117, 81, 77, 182, 210, 40, 135, \
+        198, 34, 170, 239, 78, 246, 219, 237, 68, 245, 232
 
 // Current kit mainnet preset program id. Kept as a separate symbol so tests can
 // catch future drift between generated artifacts and kit preset wiring.
 // HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK
-#define PROGRAM_ID_AGENC_MAINNET_PRESET \
-    242, 79, 6, 99, 64, 38, 134, 189, 153, 254, 99, 205, 191, 250, 117, 81, 77, \
-        182, 210, 40, 135, 198, 34, 170, 239, 78, 246, 219, 237, 68, 245, 232
+#define PROGRAM_ID_AGENC_MAINNET_PRESET                                                            \
+    242, 79, 6, 99, 64, 38, 134, 189, 153, 254, 99, 205, 191, 250, 117, 81, 77, 182, 210, 40, 135, \
+        198, 34, 170, 239, 78, 246, 219, 237, 68, 245, 232
 
 extern const Pubkey agenc_artifact_program_id;
 extern const Pubkey agenc_mainnet_preset_program_id;
@@ -225,7 +225,6 @@ int parse_agenc_instructions(const Instruction *instruction,
 
 int print_agenc_info(const AgencInfo *info, const PrintConfig *print_config);
 
-int print_agenc_create_task_with_review_info(
-    const AgencInfo *create_info,
-    const AgencInfo *configure_info,
-    const PrintConfig *print_config);
+int print_agenc_create_task_with_review_info(const AgencInfo *create_info,
+                                             const AgencInfo *configure_info,
+                                             const PrintConfig *print_config);

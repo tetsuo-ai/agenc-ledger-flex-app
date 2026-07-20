@@ -9,7 +9,8 @@
 # from .apps.solana import SolanaClient, ErrorType
 # from .apps.solana_cmd_builder import verify_signature
 # from .apps import solana_utils as SOL
-# from spl.token.instructions import TransferCheckedParams, transfer_checked, get_associated_token_address, burn_checked, BurnCheckedParams
+# from spl.token.instructions import transfer_checked, get_associated_token_address, burn_checked
+# from spl.token.models import BurnCheckedParams, TransferCheckedParams
 # from spl.token.constants import TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID
 
 

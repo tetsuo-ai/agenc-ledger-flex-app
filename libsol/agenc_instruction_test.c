@@ -12,9 +12,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define AGENC_PROGRAM_INDEX 11
-#define SYSTEM_INDEX        10
-#define COMPUTE_BUDGET_INDEX 9
+#define AGENC_PROGRAM_INDEX   11
+#define SYSTEM_INDEX          10
+#define COMPUTE_BUDGET_INDEX  9
 #define MESSAGE_PROGRAM_INDEX 8
 #define MESSAGE_SYSTEM_INDEX  7
 
@@ -127,9 +127,19 @@ static void build_create_review_message(TestMessageBuilder *builder,
         0x00,
     };
     uint8_t create_accounts[] = {
-        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        6,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
     };
     uint8_t configure_accounts[] = {0, 4, 5, 2, 3, 6, SYSTEM_INDEX};
     uint8_t configure_data[] = {
@@ -231,15 +241,55 @@ void test_parse_register_agent() {
 
     uint8_t accounts[] = {0, 1, 6, SYSTEM_INDEX};
     uint8_t data[] = {
-        0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e,  // discriminator
-        BYTES32_BS58_2,                                   // agent_id
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // capabilities
-        0x13, 0x00, 0x00, 0x00,                          // endpoint length
-        'h',  't',  't',  'p',  's',  ':',  '/',  '/',
-        'a',  'g',  'e',  'n',  't',  '.',  'l',  'o',
-        'c',  'a',  'l',                                  // endpoint
-        0x00,                                             // metadata_uri none
-        0x80, 0x96, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00,  // stake_amount
+        0x87,
+        0x9d,
+        0x42,
+        0xc3,
+        0x02,
+        0x71,
+        0xaf,
+        0x1e,            // discriminator
+        BYTES32_BS58_2,  // agent_id
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // capabilities
+        0x13,
+        0x00,
+        0x00,
+        0x00,  // endpoint length
+        'h',
+        't',
+        't',
+        'p',
+        's',
+        ':',
+        '/',
+        '/',
+        'a',
+        'g',
+        'e',
+        'n',
+        't',
+        '.',
+        'l',
+        'o',
+        'c',
+        'a',
+        'l',   // endpoint
+        0x00,  // metadata_uri none
+        0x80,
+        0x96,
+        0x98,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // stake_amount
     };
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -272,15 +322,55 @@ void test_parse_register_agent() {
 void test_process_register_agent_message() {
     uint8_t accounts[] = {0, 1, 6, SYSTEM_INDEX};
     uint8_t data[] = {
-        0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e,  // discriminator
-        BYTES32_BS58_2,                                   // agent_id
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // capabilities
-        0x13, 0x00, 0x00, 0x00,                          // endpoint length
-        'h',  't',  't',  'p',  's',  ':',  '/',  '/',
-        'a',  'g',  'e',  'n',  't',  '.',  'l',  'o',
-        'c',  'a',  'l',                                  // endpoint
-        0x00,                                             // metadata_uri none
-        0x80, 0x96, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00,  // stake_amount
+        0x87,
+        0x9d,
+        0x42,
+        0xc3,
+        0x02,
+        0x71,
+        0xaf,
+        0x1e,            // discriminator
+        BYTES32_BS58_2,  // agent_id
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // capabilities
+        0x13,
+        0x00,
+        0x00,
+        0x00,  // endpoint length
+        'h',
+        't',
+        't',
+        'p',
+        's',
+        ':',
+        '/',
+        '/',
+        'a',
+        'g',
+        'e',
+        'n',
+        't',
+        '.',
+        'l',
+        'o',
+        'c',
+        'a',
+        'l',   // endpoint
+        0x00,  // metadata_uri none
+        0x80,
+        0x96,
+        0x98,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // stake_amount
     };
 
     TestMessageBuilder builder = {0};
@@ -294,27 +384,124 @@ void test_parse_create_task_with_review_and_print() {
     MessageHeader header = test_header(pubkeys, 2);
 
     uint8_t create_accounts[] = {
-        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        6,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
     };
     uint8_t create_data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
-        BYTES32_BS58_2,                                   // task_id
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // required_capabilities
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,                              // description
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,  // reward_amount
-        0x01,                                            // max_workers
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,  // deadline
-        0x00,                                            // task_type
-        0x00,                                            // constraint_hash none
-        0x05, 0x00,                                      // min_reputation
-        0x00,                                            // reward_mint none
+        0xc2,
+        0x50,
+        0x06,
+        0xb4,
+        0xe8,
+        0x7f,
+        0x30,
+        0xab,            // discriminator
+        BYTES32_BS58_2,  // task_id
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // required_capabilities
+        't',
+        'e',
+        's',
+        't',
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,  // description
+        0x00,
+        0xca,
+        0x9a,
+        0x3b,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // reward_amount
+        0x01,  // max_workers
+        0x00,
+        0xf1,
+        0x53,
+        0x65,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // deadline
+        0x00,  // task_type
+        0x00,  // constraint_hash none
+        0x05,
+        0x00,  // min_reputation
+        0x00,  // reward_mint none
     };
     Instruction create_ix = {
         AGENC_PROGRAM_INDEX,
@@ -378,27 +565,124 @@ void test_process_create_task_with_review_message() {
 
     Hash blockhash = {{BYTES32_BS58_8}};
     uint8_t create_accounts[] = {
-        0, 1, 2, 3, 4, 6, 6, MESSAGE_SYSTEM_INDEX,
-        MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX,
-        MESSAGE_PROGRAM_INDEX, MESSAGE_PROGRAM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        6,
+        MESSAGE_SYSTEM_INDEX,
+        MESSAGE_PROGRAM_INDEX,
+        MESSAGE_PROGRAM_INDEX,
+        MESSAGE_PROGRAM_INDEX,
+        MESSAGE_PROGRAM_INDEX,
+        MESSAGE_PROGRAM_INDEX,
     };
     uint8_t create_data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
-        BYTES32_BS58_2,                                   // task_id
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // required_capabilities
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,                              // description
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,  // reward_amount
-        0x01,                                            // max_workers
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,  // deadline
-        0x00,                                            // task_type
-        0x00,                                            // constraint_hash none
-        0x05, 0x00,                                      // min_reputation
-        0x00,                                            // reward_mint none
+        0xc2,
+        0x50,
+        0x06,
+        0xb4,
+        0xe8,
+        0x7f,
+        0x30,
+        0xab,            // discriminator
+        BYTES32_BS58_2,  // task_id
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // required_capabilities
+        't',
+        'e',
+        's',
+        't',
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,  // description
+        0x00,
+        0xca,
+        0x9a,
+        0x3b,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // reward_amount
+        0x01,  // max_workers
+        0x00,
+        0xf1,
+        0x53,
+        0x65,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // deadline
+        0x00,  // task_type
+        0x00,  // constraint_hash none
+        0x05,
+        0x00,  // min_reputation
+        0x00,  // reward_mint none
     };
     uint8_t configure_accounts[] = {0, 4, 5, 2, 3, 6, MESSAGE_SYSTEM_INDEX};
     uint8_t configure_data[] = {
@@ -457,13 +741,34 @@ void test_parse_set_task_job_spec() {
     MessageHeader header = test_header(pubkeys, 1);
 
     uint8_t accounts[] = {
-        2, 0, 3, 4, AGENC_PROGRAM_INDEX, 5, 6, 7, SYSTEM_INDEX,
+        2,
+        0,
+        3,
+        4,
+        AGENC_PROGRAM_INDEX,
+        5,
+        6,
+        7,
+        SYSTEM_INDEX,
     };
     uint8_t data[] = {
-        0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1,  // discriminator
-        BYTES32_BS58_3,                                   // job_spec_hash
-        0x04, 0x00, 0x00, 0x00,                          // Borsh string length
-        'i',  'p',  'f',  's',
+        0x86,
+        0x66,
+        0x66,
+        0x56,
+        0x1f,
+        0xa4,
+        0xca,
+        0xc1,            // discriminator
+        BYTES32_BS58_3,  // job_spec_hash
+        0x04,
+        0x00,
+        0x00,
+        0x00,  // Borsh string length
+        'i',
+        'p',
+        'f',
+        's',
     };
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -525,9 +830,16 @@ void test_parse_submit_task_result() {
 
     uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, SYSTEM_INDEX};
     uint8_t data[] = {
-        0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07,  // discriminator
-        BYTES32_BS58_4,                                   // proof_hash
-        0x01,                                             // result_data some
+        0x27,
+        0x6c,
+        0x4a,
+        0x04,
+        0x42,
+        0x7d,
+        0x9d,
+        0x07,            // discriminator
+        BYTES32_BS58_4,  // proof_hash
+        0x01,            // result_data some
         BYTES32_BS58_5,
         BYTES32_BS58_6,
     };
@@ -560,23 +872,85 @@ void test_parse_submit_artifact_result_hash() {
 
     uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, SYSTEM_INDEX};
     uint8_t expected_artifact_hash[HASH_SIZE] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+        0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+        0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
     };
     uint8_t data[] = {
-        0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07,  // discriminator
-        BYTES32_BS58_4,                                   // proof_hash
-        0x01,                                             // result_data some
-        'a',  'r',  't',  'i',  'f',  'a',  'c',  't',
-        ':',  's',  'h',  'a',  '2',  '5',  '6',  ':',
-        'A',  'A',  'E',  'C',  'A',  'w',  'Q',  'F',
-        'B',  'g',  'c',  'I',  'C',  'Q',  'o',  'L',
-        'D',  'A',  '0',  'O',  'D',  'x',  'A',  'R',
-        'E',  'h',  'M',  'U',  'F',  'R',  'Y',  'X',
-        'G',  'B',  'k',  'a',  'G',  'x',  'w',  'd',
-        'H',  'h',  '8',  0,    0,    0,    0,    0,
+        0x27,
+        0x6c,
+        0x4a,
+        0x04,
+        0x42,
+        0x7d,
+        0x9d,
+        0x07,            // discriminator
+        BYTES32_BS58_4,  // proof_hash
+        0x01,            // result_data some
+        'a',
+        'r',
+        't',
+        'i',
+        'f',
+        'a',
+        'c',
+        't',
+        ':',
+        's',
+        'h',
+        'a',
+        '2',
+        '5',
+        '6',
+        ':',
+        'A',
+        'A',
+        'E',
+        'C',
+        'A',
+        'w',
+        'Q',
+        'F',
+        'B',
+        'g',
+        'c',
+        'I',
+        'C',
+        'Q',
+        'o',
+        'L',
+        'D',
+        'A',
+        '0',
+        'O',
+        'D',
+        'x',
+        'A',
+        'R',
+        'E',
+        'h',
+        'M',
+        'U',
+        'F',
+        'R',
+        'Y',
+        'X',
+        'G',
+        'B',
+        'k',
+        'a',
+        'G',
+        'x',
+        'w',
+        'd',
+        'H',
+        'h',
+        '8',
+        0,
+        0,
+        0,
+        0,
+        0,
     };
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -606,9 +980,27 @@ void test_parse_accept_task_result_marks_reward_unknown() {
     MessageHeader header = test_header(pubkeys, 1);
 
     uint8_t accounts[] = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, SYSTEM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        1,
+        2,
+        3,
+        4,
+        5,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        SYSTEM_INDEX,
     };
     uint8_t data[] = {0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
     Instruction instruction = {
@@ -638,8 +1030,15 @@ void test_parse_reject_task_result() {
 
     uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX, 9};
     uint8_t data[] = {
-        0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6,  // discriminator
-        BYTES32_BS58_6,                                   // rejection_hash
+        0x90,
+        0x07,
+        0x3a,
+        0xe8,
+        0x9d,
+        0xa7,
+        0x55,
+        0xd6,            // discriminator
+        BYTES32_BS58_6,  // rejection_hash
     };
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -666,10 +1065,24 @@ void test_parse_cancel_task_with_remaining_worker_accounts() {
     MessageHeader header = test_header(pubkeys, 1);
 
     uint8_t accounts[] = {
-        0, 1, 2, 3, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
-        0, 1, 6,
+        0,
+        1,
+        2,
+        3,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        0,
+        1,
+        6,
     };
     uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
     Instruction instruction = {
@@ -729,13 +1142,34 @@ void test_parse_expire_claim_with_submission() {
 
 void test_process_set_task_job_spec_message() {
     uint8_t accounts[] = {
-        2, 0, 3, 4, AGENC_PROGRAM_INDEX, 5, 6, 7, SYSTEM_INDEX,
+        2,
+        0,
+        3,
+        4,
+        AGENC_PROGRAM_INDEX,
+        5,
+        6,
+        7,
+        SYSTEM_INDEX,
     };
     uint8_t data[] = {
-        0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1,
+        0x86,
+        0x66,
+        0x66,
+        0x56,
+        0x1f,
+        0xa4,
+        0xca,
+        0xc1,
         BYTES32_BS58_3,
-        0x04, 0x00, 0x00, 0x00,
-        'i',  'p',  'f',  's',
+        0x04,
+        0x00,
+        0x00,
+        0x00,
+        'i',
+        'p',
+        'f',
+        's',
     };
 
     TestMessageBuilder builder = {0};
@@ -756,7 +1190,14 @@ void test_process_claim_task_message() {
 void test_process_submit_task_result_message() {
     uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, SYSTEM_INDEX};
     uint8_t data[] = {
-        0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07,
+        0x27,
+        0x6c,
+        0x4a,
+        0x04,
+        0x42,
+        0x7d,
+        0x9d,
+        0x07,
         BYTES32_BS58_4,
         0x01,
         BYTES32_BS58_5,
@@ -771,9 +1212,27 @@ void test_process_submit_task_result_message() {
 
 void test_process_accept_task_result_message() {
     uint8_t accounts[] = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, SYSTEM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        1,
+        2,
+        3,
+        4,
+        5,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        SYSTEM_INDEX,
     };
     uint8_t data[] = {0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
 
@@ -786,7 +1245,14 @@ void test_process_accept_task_result_message() {
 void test_process_reject_task_result_message() {
     uint8_t accounts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, SYSTEM_INDEX, 9};
     uint8_t data[] = {
-        0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6,
+        0x90,
+        0x07,
+        0x3a,
+        0xe8,
+        0x9d,
+        0xa7,
+        0x55,
+        0xd6,
         BYTES32_BS58_6,
     };
 
@@ -797,10 +1263,24 @@ void test_process_reject_task_result_message() {
 
 void test_process_cancel_task_message() {
     uint8_t accounts[] = {
-        0, 1, 2, 3, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
-        0, 1, 6,
+        0,
+        1,
+        2,
+        3,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        0,
+        1,
+        6,
     };
     uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
 
@@ -822,22 +1302,18 @@ void test_process_expire_claim_message() {
 
 void test_process_compute_budget_create_task_with_review_message() {
     uint8_t create_data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
-        BYTES32_BS58_2,
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,
-        0x01,
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-        0x00,
-        0x05, 0x00,
-        0x00,
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab, BYTES32_BS58_2,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 't',
+        'e',  's',  't',  0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x05, 0x00, 0x00,
     };
 
     TestMessageBuilder builder = {0};
@@ -851,27 +1327,33 @@ void test_process_compute_budget_create_task_with_review_message() {
 
 void test_process_lone_create_task_message() {
     uint8_t accounts[] = {
-        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        6,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
     };
     uint8_t data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
-        BYTES32_BS58_2,
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,
-        0x01,
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-        0x00,
-        0x05, 0x00,
-        0x00,
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab, BYTES32_BS58_2,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 't',
+        'e',  's',  't',  0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x05, 0x00, 0x00,
     };
 
     TestMessageBuilder builder = {0};
@@ -883,22 +1365,18 @@ void test_process_lone_create_task_message() {
 
 void test_process_multi_worker_create_task_with_review_message() {
     uint8_t create_data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
-        BYTES32_BS58_2,
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,
-        0x02,
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-        0x00,
-        0x05, 0x00,
-        0x00,
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab, BYTES32_BS58_2,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 't',
+        'e',  's',  't',  0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00, 0x02,
+        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x05, 0x00, 0x00,
     };
 
     TestMessageBuilder builder = {0};
@@ -910,22 +1388,20 @@ void test_process_multi_worker_create_task_with_review_message() {
 
 void test_process_custom_task_type_create_task_with_review_message() {
     uint8_t create_data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,
-        BYTES32_BS58_2,
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        't',  'e',  's',  't',  0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,
+        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab, BYTES32_BS58_2,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 't',
+        'e',  's',  't',  0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,    0,    0,    0,    0,    0,
         0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,
-        0x01,                                            // max_workers
+        0x01,  // max_workers
         0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,
-        0x02,                                            // task_type (non-default)
-        0x00,
-        0x05, 0x00,
-        0x00,
+        0x02,  // task_type (non-default)
+        0x00, 0x05, 0x00, 0x00,
     };
 
     TestMessageBuilder builder = {0};
@@ -944,28 +1420,125 @@ void test_reject_create_task_non_commitment_description() {
     MessageHeader header = test_header(pubkeys, 2);
 
     uint8_t accounts[] = {
-        0, 1, 2, 3, 4, 6, 6, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        6,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
     };
     uint8_t data[] = {
-        0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab,  // discriminator
-        BYTES32_BS58_2,                                   // task_id
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // required_capabilities
+        0xc2,
+        0x50,
+        0x06,
+        0xb4,
+        0xe8,
+        0x7f,
+        0x30,
+        0xab,            // discriminator
+        BYTES32_BS58_2,  // task_id
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // required_capabilities
         // 64-byte description with a non-zero byte in the commitment tail
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0,    0,    0,    0,    0,     0,    0,    0,    0,
-        0,    0,    0,    0xaa,                            // non-zero tail byte
-        0x00, 0xca, 0x9a, 0x3b, 0x00, 0x00, 0x00, 0x00,  // reward_amount
-        0x01,                                            // max_workers
-        0x00, 0xf1, 0x53, 0x65, 0x00, 0x00, 0x00, 0x00,  // deadline
-        0x00,                                            // task_type
-        0x00,                                            // constraint_hash none
-        0x05, 0x00,                                      // min_reputation
-        0x00,                                            // reward_mint none
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0xaa,  // non-zero tail byte
+        0x00,
+        0xca,
+        0x9a,
+        0x3b,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // reward_amount
+        0x01,  // max_workers
+        0x00,
+        0xf1,
+        0x53,
+        0x65,
+        0x00,
+        0x00,
+        0x00,
+        0x00,  // deadline
+        0x00,  // task_type
+        0x00,  // constraint_hash none
+        0x05,
+        0x00,  // min_reputation
+        0x00,  // reward_mint none
     };
     Instruction instruction = {
         AGENC_PROGRAM_INDEX,
@@ -1044,10 +1617,27 @@ void test_reject_ambiguous_cancel_suffix() {
     // BidExclusive settlement accounts. Without Task state the device cannot
     // label that safely, so clear signing must fail closed.
     uint8_t accounts[] = {
-        0, 1, 2, 3, SYSTEM_INDEX,
-        AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX, AGENC_PROGRAM_INDEX,
-        AGENC_PROGRAM_INDEX, 4, 5, 6, 7, 8, 9,
-        0, 1, 2, 3, 4, 5,
+        0,
+        1,
+        2,
+        3,
+        SYSTEM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        AGENC_PROGRAM_INDEX,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
     };
     uint8_t data[] = {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
     Instruction instruction = {

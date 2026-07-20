@@ -22,7 +22,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   guidelines_enforcer:
     name: Call Ledger guidelines_enforcer
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_guidelines_enforcer.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_guidelines_enforcer.yml

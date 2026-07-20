@@ -1,0 +1,141 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Check Makefile
+
+on:
+  workflow_call:
+    inputs:
+      workflows_ref:
+        description: 'The current reference in use for the ledger-app-workflow repository'
+        required: true
+        type: string
+      app_repository:
+        description: 'The URL of the app repository to check. Defaults to the workflow caller repository URL'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      app_branch_name:
+        description: 'The immutable GIT revision to inspect (defaults to `github.sha`)'
+        required: false
+        default: ${{ github.sha }}
+        type: string
+      builder:
+        description: "The allowlisted Ledger builder profile (defaults to ledger-app-builder-lite)"
+        required: false
+        default: 'ledger-app-builder-lite'
+        type: string
+      repo_name:
+        description: 'The name of the app repository to check. Defaults to the workflow caller repository name'
+        required: false
+        default: ${{ github.event.repository.name }}
+        type: string
+      download_manifest_artifact_name:
+        description: 'The name of the artifact containing the built manifest'
+        required: true
+        type: string
+      run_for_devices:
+        description: 'The list of device(s) on which the checking will run'
+        required: true
+        type: string
+      flags:
+        description: "Additional compilation flags (default to none)"
+        required: false
+        default: ''
+        type: string
+      use_case:
+        description: "The use case to build the application for. Ignored if 'flags' is set"
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read  # Needed to clone the repositories
+
+env:
+  WORKFLOWS_REF: ${{ inputs.workflows_ref }}
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  APP_BRANCH_NAME: ${{ inputs.app_branch_name }}
+  REPO_NAME: ${{ inputs.repo_name }}
+  DOWNLOAD_MANIFEST_ARTIFACT_NAME: ${{ inputs.download_manifest_artifact_name }}
+  RUN_FOR_DEVICES: ${{ inputs.run_for_devices }}
+
+jobs:
+  call_get_app_metadata:
+    # This job digests inputs and repository metadata provided by the `ledger_app.toml` manifest
+    # file, in order to output relevant directories, compatible devices, and other variables needed
+    # by following jobs.
+    name: Retrieve application metadata
+    uses: ./.github/workflows/_get_app_metadata.yml
+    with:
+      app_repository: ${{ inputs.app_repository }}
+      app_branch_name: ${{ inputs.app_branch_name }}
+      compatible_devices: ${{ inputs.run_for_devices }}
+      flags: ${{ inputs.flags }}
+      use_case: ${{ inputs.use_case }}
+    secrets:
+      token: ${{ secrets.token }}
+
+  check_makefile:
+    name: Check Makefile
+    needs: call_get_app_metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.run_for_devices) }}
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ inputs.builder == 'ledger-app-builder' && 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder@sha256:a823f13dba372213b508870874a2d16dcab898972e212ceb18bab0c44c0c7856' || 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7' }}
+
+    steps:
+      - name: Clone ledger-app-workflows repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-app-workflows
+          path: ./ledger-app-workflows
+          ref: ${{ inputs.workflows_ref }}
+          persist-credentials: false
+
+      - name: Clone app repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          path: app-repository
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Download manifest
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.download_manifest_artifact_name }}
+          path: ${{ inputs.download_manifest_artifact_name }}
+
+      - name: Set device-specific environment variables
+        if: ${{ needs.call_get_app_metadata.outputs.is_rust == 'false' }}
+        shell: bash
+        run: |
+          case "${MATRIX_DEVICE}" in
+            nanos|nanox|nanosp|stax|flex|apex_m|apex_p) ;;
+            *)
+              echo "Unsupported Ledger device: ${MATRIX_DEVICE}" >&2
+              exit 1
+              ;;
+          esac
+          sdk_variable="${MATRIX_DEVICE^^}_SDK"
+          BOLOS_SDK="${!sdk_variable:-}"
+          if [[ -z "${BOLOS_SDK}" ]]; then
+            echo "SDK variable ${sdk_variable} is not available." >&2
+            exit 1
+          fi
+          echo "BOLOS_SDK=${BOLOS_SDK}" >> "${GITHUB_ENV}"
+          echo "BOLOS_SDK will be set to: ${BOLOS_SDK}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Run script
+        run: |
+            [ ${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST} = 'true' ] && EXTRA_FLAGS=-r
+            ./ledger-app-workflows/scripts/check_all.sh -c makefile -t "${MATRIX_DEVICE}" \
+              -a ./app-repository -m "${DOWNLOAD_MANIFEST_ARTIFACT_NAME}" -w ./ledger-app-workflows $EXTRA_FLAGS
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          MATRIX_DEVICE: ${{ matrix.device }}

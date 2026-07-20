@@ -1,0 +1,92 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Run Clang Static Analyzer (master SDK)
+
+on:
+  workflow_call:
+    inputs:
+      workflows_ref:
+        description: 'The current reference in use for the ledger-app-workflow repository'
+        required: true
+        type: string
+      app_repository:
+        description: 'The URL of the app repository to check. Defaults to the workflow caller repository URL'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      run_for_devices:
+        description: 'The list of device(s) on which the checking will run'
+        required: true
+        type: string
+      relative_app_directory:
+        description: 'The relative path in the repository where the application is built from (defaults to ".")'
+        required: false
+        default: '.'
+        type: string
+      is_rust:
+        description: '"true" if the app is using Rust SDK, else "false"'
+        required: true
+        type: string
+
+permissions:
+  contents: read  # Needed to clone the repositories
+
+env:
+  WORKFLOWS_REF: ${{ inputs.workflows_ref }}
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  RUN_FOR_DEVICES: ${{ inputs.run_for_devices }}
+  RELATIVE_APP_DIRECTORY: ${{ inputs.relative_app_directory }}
+  IS_RUST: ${{ inputs.is_rust }}
+
+jobs:
+  scan_build:
+    name: Clang Static Analyzer on master
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.run_for_devices) }}
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder@sha256:a823f13dba372213b508870874a2d16dcab898972e212ceb18bab0c44c0c7856
+
+    steps:
+      - name: Clone ledger-app-workflows repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-app-workflows
+          path: ./ledger-app-workflows
+          ref: ${{ inputs.workflows_ref }}
+          persist-credentials: false
+
+      - name: Clone app repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          path: app-repository
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Clone SDK
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-secure-sdk
+          path: sdk
+          ref: e604abab0187c7bb247e26251b275c5592a4e229 # master, resolved 2026-07-20
+          persist-credentials: false
+
+      - name: Build with Clang Static Analyzer
+        if: ${{ inputs.is_rust == 'false'}}
+        shell: bash
+        run: |
+          export BOLOS_SDK="${GITHUB_WORKSPACE}/sdk"
+          ./ledger-app-workflows/scripts/check_all.sh -c scan -t "${MATRIX_DEVICE}" \
+            -a ./app-repository -b "${RELATIVE_APP_DIRECTORY}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Upload scan result
+        if: ${{ failure() && inputs.is_rust == 'false'}}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: scan-build
+          path: scan-build

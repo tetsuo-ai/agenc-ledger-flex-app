@@ -1,0 +1,113 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Output metadata on the application, inferred from the local 'ledger_app.toml' manifest or not
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        description: 'A token passed from the caller workflow'
+        required: false
+    inputs:
+      app_repository:
+        description: 'The GIT repository to build (defaults to `github.repository`)'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      app_branch_name:
+        description: 'The immutable GIT revision to inspect (defaults to `github.sha`)'
+        required: false
+        default: ${{ github.sha }}
+        type: string
+      pytest_directory:
+        description: |
+          The directory where the Python tests are stored (a `conftest.py` file is expected inside).
+        required: false
+        default: 'None'
+        type: string
+    outputs:
+      pytest_directory:
+        description: |
+          The directory where the Python tests are stored (a `conftest.py` file is expected inside).
+        value: ${{ jobs.fetch_metadata.outputs.pytest_directory }}
+
+env:
+  APP_MANIFEST: "ledger_app.toml"
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  APP_BRANCH_NAME: ${{ inputs.app_branch_name }}
+  PYTEST_DIRECTORY: ${{ inputs.pytest_directory }}
+
+permissions:
+  contents: read  # Needed to clone the repositories
+
+jobs:
+  fetch_metadata:
+    name: Retrieve tests metadata
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7
+
+    steps:
+      - name: Clone app repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          ref: ${{ inputs.app_branch_name }}
+          submodules: recursive
+          token: ${{ secrets.token && secrets.token || github.token }}
+          persist-credentials: false
+
+      - name: Gather application metadata, from inputs or 'ledger_app.toml'
+        id: fetch_metadata
+        run: |
+          # Fail if manifest file is missing
+          if [ ! -f "$APP_MANIFEST" ]; then
+              >&2 echo "/!\ No $APP_MANIFEST manifest detected!"
+              >&2 echo "This file is mandatory, please add it to your repository"
+              >&2 echo "Documentation: https://github.com/LedgerHQ/ledgered/blob/master/doc/utils/manifest.md"
+              exit 1
+          fi
+
+          echo "Manifest detected."
+          ledger-manifest --check . "$APP_MANIFEST"
+
+          if [ "${PYTEST_DIRECTORY}" != "None" ]; then
+              # Use the provided input as-is
+              pytest_directory="${PYTEST_DIRECTORY}"
+
+              # Check if it's listed in the manifest
+              manifest_json="$(ledger-manifest --output-pytest-directories -j -- "$APP_MANIFEST")"
+              mapfile -t manifest_dirs < <(echo "$manifest_json" | jq -r '.pytest_directories[].directory')
+
+              found=0
+              for dir in "${manifest_dirs[@]}"; do
+                  if [ "$dir" = "${PYTEST_DIRECTORY}" ]; then
+                      found=1
+                      break
+                  fi
+              done
+
+              if [ "$found" -ne 1 ]; then
+                  >&2 echo "::warning::Provided pytest_directory '${PYTEST_DIRECTORY}' not found in manifest. Proceeding anyway."
+              fi
+
+          else
+              # No input: try to infer the directory using legacy logic
+              set +e
+              pytest_directory="$(ledger-manifest --output-tests-pytest-directory "$APP_MANIFEST")"
+              status=$?
+              set -e
+
+              if [ "$status" -ne 0 ]; then
+                  >&2 echo "Error: Could not infer pytest_directory automatically. Multiple or missing entries in manifest."
+                  exit 1
+              fi
+          fi
+
+          # Set output for downstream steps or workflows
+          echo "pytest_directory=${pytest_directory}" >> "${GITHUB_OUTPUT}"
+          echo "Inferred test metadata:"
+          cat "${GITHUB_OUTPUT}"
+
+    outputs:
+      pytest_directory: ${{ steps.fetch_metadata.outputs.pytest_directory }}

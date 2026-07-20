@@ -14,13 +14,12 @@ on:
   push:
     branches:
       - master
+      - main
       - develop
   pull_request:
 
 permissions:
-  contents: write       # Needed for snapshot PR creation in ragger/swap tests
-  actions: write        # Needed for upload-artifact in build and test workflows
-  pull-requests: write  # Needed for PR comments and snapshot PR creation
+  contents: read
 
 # Cancel previous runs on this reference
 concurrency:
@@ -30,7 +29,7 @@ concurrency:
 jobs:
   build_application:
     name: Build application using the reusable workflow
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_build.yml
     with:
       upload_app_binaries_artifact: compiled_app_binaries
       flags: "TRUSTED_NAME_TEST_KEY=1"
@@ -40,35 +39,63 @@ jobs:
   standalone_tests:
     name: Run ragger tests using the reusable workflow
     needs: build_application
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_ragger_tests.yml
     with:
       download_app_binaries_artifact: compiled_app_binaries
-      regenerate_snapshots: ${{ inputs.golden_run == 'Open a PR' }}
+      regenerate_snapshots: false
       test_dir: "tests/python"
       post_stack_consumption: true
 
   tests_swap:
     name: Run swap tests using the reusable workflow
     needs: build_application
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_swap_tests.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_swap_tests.yml
     with:
       download_app_binaries_artifact: compiled_app_binaries
-      regenerate_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
+      regenerate_snapshots: false
+
+  update_standalone_snapshots:
+    name: Regenerate standalone snapshots
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
+    needs: build_application
+    permissions:
+      contents: write       # Required only for the manually requested snapshot branch.
+      pull-requests: write  # Required only to open the snapshot review pull request.
+    uses: ./.github/workflows/reusable_ragger_tests.yml
+    with:
+      download_app_binaries_artifact: compiled_app_binaries
+      regenerate_snapshots: true
+      test_dir: "tests/python"
+      post_stack_consumption: false
+
+  update_swap_snapshots:
+    name: Regenerate swap snapshots
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
+    needs: build_application
+    permissions:
+      contents: write       # Required only for the manually requested snapshot branch.
+      pull-requests: write  # Required only to open the snapshot review pull request.
+    uses: ./.github/workflows/reusable_swap_tests.yml
+    with:
+      download_app_binaries_artifact: compiled_app_binaries
+      regenerate_snapshots: true
 
   job_C_test:
     name: C tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7 # latest linux/amd64, resolved 2026-07-20
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7 # linux/amd64, resolved 2026-07-20
     steps:
       - name: Clone
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
       - name: Build unit tests
         run: make -C libsol
 
   build_mem_app:
     name: Build Memory application using the reusable workflow
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_build.yml
     with:
       upload_app_binaries_artifact: "memory_elfs"
       flags: "memory_profiling"
@@ -77,7 +104,7 @@ jobs:
   ragger_mem_tests:
     name: Run Memory tests using the reusable workflow
     needs: build_mem_app
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a # v1
+    uses: ./.github/workflows/reusable_ragger_tests.yml
     with:
       download_app_binaries_artifact: "memory_elfs"
       run_for_devices: '["flex"]'
@@ -88,10 +115,12 @@ jobs:
     name: Process pytest logs
     if: always()
     needs: ragger_mem_tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Clone
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Download and process pytest logs
         if: always()

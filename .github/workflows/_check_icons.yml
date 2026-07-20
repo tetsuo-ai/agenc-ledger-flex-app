@@ -1,0 +1,78 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Check icons
+
+on:
+  workflow_call:
+    inputs:
+      workflows_ref:
+        description: 'The current reference in use for the ledger-app-workflow repository'
+        required: true
+        type: string
+      app_repository:
+        description: 'The URL of the app repository to check. Defaults to the workflow caller repository URL'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      repo_name:
+        description: 'The name of the app repository to check. Defaults to the workflow caller repository name'
+        required: false
+        default: ${{ github.event.repository.name }}
+        type: string
+      download_manifest_artifact_name:
+        description: 'The name of the artifact containing the built manifest'
+        required: true
+        type: string
+      run_for_devices:
+        description: 'The list of device(s) on which the checking will run'
+        required: true
+        type: string
+
+permissions:
+  contents: read  # Needed to clone the repositories
+
+env:
+  WORKFLOWS_REF: ${{ inputs.workflows_ref }}
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  REPO_NAME: ${{ inputs.repo_name }}
+  DOWNLOAD_MANIFEST_ARTIFACT_NAME: ${{ inputs.download_manifest_artifact_name }}
+  RUN_FOR_DEVICES: ${{ inputs.run_for_devices }}
+
+jobs:
+  check_icons:
+    name: Check icons
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.run_for_devices) }}
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Clone ledger-app-workflows repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: LedgerHQ/ledger-app-workflows
+          path: ./ledger-app-workflows
+          ref: ${{ inputs.workflows_ref }}
+          persist-credentials: false
+
+      - name: Clone app repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          path: app-repository
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Download manifest
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.download_manifest_artifact_name }}
+          path: ${{ inputs.download_manifest_artifact_name }}
+
+      - name: Run script
+        run: |
+            ./ledger-app-workflows/scripts/check_all.sh -c icons -t "${MATRIX_DEVICE}" \
+              -a ./app-repository -m "${DOWNLOAD_MANIFEST_ARTIFACT_NAME}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}

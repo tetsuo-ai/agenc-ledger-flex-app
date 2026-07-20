@@ -1,0 +1,623 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+name: Build the application for all devices and upload the artifact
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        description: 'A token passed from the caller workflow'
+        required: false
+    inputs:
+      app_repository:
+        description: 'The GIT repository to build (defaults to `github.repository`)'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      app_branch_name:
+        description: 'The immutable GIT revision to build (defaults to `github.sha`)'
+        required: false
+        default: ${{ github.sha }}
+        type: string
+      flags:
+        description: "Additional compilation flags (default to none)"
+        required: false
+        default: ''
+        type: string
+      use_case:
+        description: "The use case to build the application for. Ignored if 'flags' is set"
+        required: false
+        default: ''
+        type: string
+      upload_app_binaries_artifact:
+        description: "The name of the artifact containing the built application binary file(s) to be tested"
+        required: false
+        default: ''
+        type: string
+      upload_as_lib_artifact:
+        description: "If non-empty, prefixes the built application binary file(s) with this string (default to none)"
+        required: false
+        default: ''
+        type: string
+      run_for_devices:
+        description: |
+          The list of device(s) on which the CI will run.
+
+          Defaults to the full list of device(s) supported by the application as configured in the
+          'ledger_app.toml' manifest.
+          If the manifest is missing, defaults to ALL (["nanos", "nanox", "nanosp", "stax", "flex", "apex_m", "apex_p"]).
+        required: false
+        default: 'None'
+        type: string
+      builder:
+        description: "The allowlisted Ledger builder profile (defaults to ledger-app-builder-lite)"
+        required: false
+        default: 'ledger-app-builder-lite'
+        type: string
+      sdk_reference:
+        description: |
+          An immutable 40-character SDK commit to check out before building a C app.
+          If omitted, the SDK embedded in the digest-pinned builder image is used.
+        required: false
+        default: ""
+        type: string
+      features:
+        description: >
+          Space-separated list of Cargo features to enable for Rust applications.
+          Each entry is passed as `--features <name>` to the `cargo ledger build`
+          command (e.g. app variants such as 'variant_testnet').
+        required: false
+        default: ""
+        type: string
+      build_comparison:
+        description: "Whether to perform a build comparison between source and target branches (defaults to false).
+                      Requires upload_app_binaries_artifact to be set.
+                      If false, no target branch build or target artifact is produced."
+        required: false
+        default: false
+        type: boolean
+      enable_stack_consumption:
+        description: "Whether to enable stack consumption tracking in the build (defaults to false).
+                      Sets DEBUG_OS_STACK_CONSUMPTION=1 for C apps and --features stack_usage for Rust apps."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  APP_BRANCH_NAME: ${{ inputs.app_branch_name }}
+  FLAGS: ${{ inputs.flags }}
+  USE_CASE: ${{ inputs.use_case }}
+  UPLOAD_APP_BINARIES_ARTIFACT: ${{ inputs.upload_app_binaries_artifact }}
+  UPLOAD_AS_LIB_ARTIFACT: ${{ inputs.upload_as_lib_artifact }}
+  RUN_FOR_DEVICES: ${{ inputs.run_for_devices }}
+  BUILDER: ${{ inputs.builder }}
+  SDK_REFERENCE: ${{ inputs.sdk_reference }}
+  FEATURES: ${{ inputs.features }}
+  ENABLE_STACK_CONSUMPTION: ${{ inputs.enable_stack_consumption }}
+
+jobs:
+  call_get_app_metadata:
+    # This job digests inputs and repository metadata provided by the `ledger_app.toml` manifest
+    # file, in order to output relevant directories, compatible devices, and other variables needed
+    # by following jobs.
+    name: Retrieve application metadata
+    uses: ./.github/workflows/_get_app_metadata.yml
+    with:
+      app_repository: ${{ inputs.app_repository }}
+      app_branch_name: ${{ inputs.app_branch_name }}
+      compatible_devices: ${{ inputs.run_for_devices }}
+      flags: ${{ inputs.flags }}
+      use_case: ${{ inputs.use_case }}
+    secrets:
+      token: ${{ secrets.token }}
+
+  build:
+    name: Build application for all selected devices
+    needs: call_get_app_metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(needs.call_get_app_metadata.outputs.compatible_devices) }}
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ inputs.builder == 'ledger-app-builder' && 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder@sha256:a823f13dba372213b508870874a2d16dcab898972e212ceb18bab0c44c0c7856' || 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7' }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          ref: ${{ inputs.app_branch_name }}
+          submodules: recursive
+          token: ${{ secrets.token && secrets.token || github.token }}
+          persist-credentials: false
+
+      - name: Set device-specific environment variables
+        if: ${{ needs.call_get_app_metadata.outputs.is_rust == 'false' }}
+        shell: bash
+        run: |
+          case "${MATRIX_DEVICE}" in
+            nanos|nanox|nanosp|stax|flex|apex_m|apex_p) ;;
+            *)
+              echo "Unsupported Ledger device: ${MATRIX_DEVICE}" >&2
+              exit 1
+              ;;
+          esac
+          sdk_variable="${MATRIX_DEVICE^^}_SDK"
+          BOLOS_SDK="${!sdk_variable:-}"
+          if [[ -z "${BOLOS_SDK}" ]]; then
+            echo "SDK variable ${sdk_variable} is not available." >&2
+            exit 1
+          fi
+          echo "BOLOS_SDK=${BOLOS_SDK}" >> "${GITHUB_ENV}"
+          echo "BOLOS_SDK will be set to: ${BOLOS_SDK}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Checkout SDK
+        if: ${{ needs.call_get_app_metadata.outputs.is_rust == 'false' && inputs.sdk_reference != '' }}
+        working-directory: ${{ env.BOLOS_SDK }}
+        shell: bash
+        run: |
+          echo "Using BOLOS_SDK: ${BOLOS_SDK}"
+          echo "Checking out reference '${SDK_REFERENCE}'..."
+          if [[ ! "${SDK_REFERENCE}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SDK reference must be an immutable 40-character commit SHA." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin "${SDK_REFERENCE}"
+          git checkout --detach "${SDK_REFERENCE}"
+          DEVICE=${MATRIX_DEVICE}
+          echo "ADDITIONAL_ARGS=TARGET=${DEVICE/sp/s2}" >> "${GITHUB_ENV}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Build application
+        id: "build"
+        working-directory: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+        shell: bash
+        run: |
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+              BUILD_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanosplus/')"
+              # Assemble everything passed to `cargo ledger build` after `--`.
+              # Features are literal names, so collect them in a quoted array to
+              # avoid glob expansion and keep argument boundaries explicit.
+              CARGO_FEATURE_ARGS=()
+              # Cargo features to enable (e.g. app variants such as `variant_*`).
+              read -r -a feature_names <<< "${FEATURES}"
+              for feature in "${feature_names[@]}"; do
+                if [[ ! "${feature}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                  echo "Invalid Cargo feature: ${feature}" >&2
+                  exit 1
+                fi
+                CARGO_FEATURE_ARGS+=(--features "${feature}")
+              done
+              # Stack consumption tracking is just another SDK feature.
+              if [ "${ENABLE_STACK_CONSUMPTION}" = "true" ]; then
+                CARGO_FEATURE_ARGS+=(--features ledger_device_sdk/stack_usage)
+              fi
+              echo "Feature args: ${CARGO_FEATURE_ARGS[*]}"
+              cargo ledger build "${BUILD_DEVICE_NAME}" -- --locked "${CARGO_FEATURE_ARGS[@]}"
+              binary_path=$(cargo metadata --no-deps --format-version 1 | jq -r '.target_directory')
+          else
+              echo "Using BOLOS_SDK: ${BOLOS_SDK}"
+              MAKE_ARGS=()
+              read -r -a manifest_make_args <<< "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_FLAGS}"
+              for arg in "${manifest_make_args[@]}"; do
+                if [[ ! "${arg}" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+$ ]]; then
+                  echo "Invalid Make argument from the application manifest: ${arg}" >&2
+                  exit 1
+                fi
+                MAKE_ARGS+=("${arg}")
+              done
+              if [ -n "${ADDITIONAL_ARGS}" ]; then
+                MAKE_ARGS+=("${ADDITIONAL_ARGS}")
+              fi
+              if [ "${ENABLE_STACK_CONSUMPTION}" = "true" ]; then
+                MAKE_ARGS+=("DEBUG_OS_STACK_CONSUMPTION=1")
+              fi
+              make -j "${MAKE_ARGS[@]}" BOLOS_SDK="${BOLOS_SDK}"
+              binary_path="${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build"
+          fi
+          if [ -z "${binary_path}" ]; then
+            echo "Build did not produce a binary path." >&2
+            exit 1
+          fi
+          echo "binary_path=${binary_path}" >> "${GITHUB_OUTPUT}"
+          echo "binary_path=${binary_path}"
+          echo "Build complete"
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          MATRIX_DEVICE: ${{ matrix.device }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_FLAGS: ${{ needs.call_get_app_metadata.outputs.flags }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+
+      - name: Remove build artifacts before upload
+        shell: bash
+        run: |
+          workspace=$(realpath -m -- "${GITHUB_WORKSPACE}")
+          binary_path=$(realpath -m -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH}")
+          case "${binary_path}" in
+            "${workspace}"/*) ;;
+            *)
+              echo "Build output must stay inside the checked-out workspace." >&2
+              exit 1
+              ;;
+          esac
+          relative_binary_path=${binary_path#"${workspace}/"}
+          case "${relative_binary_path}" in
+            .git|.git/*)
+              echo "Refusing to clean build output inside .git." >&2
+              exit 1
+              ;;
+          esac
+          if [ ! -d "${binary_path}" ]; then
+            echo "Build output directory does not exist: ${binary_path}" >&2
+            exit 1
+          fi
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+              find "${binary_path}" -mindepth 3 -maxdepth 3 -type d -exec rm -rf -- {} +
+              rm -rf -- "${binary_path}/release"
+          else
+              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d ! -name 'bin' -exec rm -rf -- {} +
+          fi
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Prepare to upload as lib
+        if: ${{ inputs.upload_as_lib_artifact != '' }}
+        shell: bash
+        run: |
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+            C_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanos2/')"
+            echo "C_DEVICE_NAME=$C_DEVICE_NAME"
+            RUST_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/sp/splus/')"
+            echo "RUST_DEVICE_NAME=$RUST_DEVICE_NAME"
+            ELF_NAME=$(cargo metadata --manifest-path "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/Cargo.toml" --no-deps --format-version 1 | jq -r '.packages[] | select(.metadata.ledger != null) | .name')
+            echo "ELF_NAME=$ELF_NAME"
+            mv "${STEPS_BUILD_OUTPUTS_BINARY_PATH}/${RUST_DEVICE_NAME}/release/${ELF_NAME}" "${STEPS_BUILD_OUTPUTS_BINARY_PATH}/${UPLOAD_AS_LIB_ARTIFACT}_${C_DEVICE_NAME}.elf"
+            rm -rf -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH:?}/${RUST_DEVICE_NAME}"
+          else
+            DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanos2/')"
+            find "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build/${DEVICE_NAME}/" -type f -name 'app.elf' -exec mv {} "${UPLOAD_AS_LIB_ARTIFACT}_${DEVICE_NAME}.elf" \;
+            build_output_dir="${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY:?}/build"
+            find "${build_output_dir}" -mindepth 1 -maxdepth 1 -exec rm -r -- {} +
+            mv "${UPLOAD_AS_LIB_ARTIFACT}_${DEVICE_NAME}.elf" "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build/"
+          fi
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          MATRIX_DEVICE: ${{ matrix.device }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Display structure of binary files
+        run: |
+          ls -1 -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH}"
+        env:
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Upload app binary
+        if: ${{ inputs.upload_app_binaries_artifact != '' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}-${{ matrix.device }}
+          path: ${{ steps.build.outputs.binary_path }}
+          if-no-files-found: error
+
+  merge_artifacts:
+    name: Merge build artifacts
+    needs: build
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.upload_app_binaries_artifact != '' }}
+    steps:
+      - uses: actions/upload-artifact/merge@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}
+          pattern: ${{ inputs.upload_app_binaries_artifact }}-*
+          delete-merged: true
+
+  # The following jobs are used in PRs, to compare builds between source and target branches.
+  build_target_branch:
+    name: Build target branch sources for all selected devices
+    if: ${{ inputs.build_comparison && github.event_name == 'pull_request' && inputs.upload_app_binaries_artifact != '' }}
+    needs: call_get_app_metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(needs.call_get_app_metadata.outputs.compatible_devices) }}
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ inputs.builder == 'ledger-app-builder' && 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder@sha256:a823f13dba372213b508870874a2d16dcab898972e212ceb18bab0c44c0c7856' || 'ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7' }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          submodules: recursive
+          token: ${{ secrets.token && secrets.token || github.token }}
+          persist-credentials: false
+
+      - name: Set device-specific environment variables
+        if: ${{ needs.call_get_app_metadata.outputs.is_rust == 'false' }}
+        shell: bash
+        run: |
+          case "${MATRIX_DEVICE}" in
+            nanos|nanox|nanosp|stax|flex|apex_m|apex_p) ;;
+            *)
+              echo "Unsupported Ledger device: ${MATRIX_DEVICE}" >&2
+              exit 1
+              ;;
+          esac
+          sdk_variable="${MATRIX_DEVICE^^}_SDK"
+          BOLOS_SDK="${!sdk_variable:-}"
+          if [[ -z "${BOLOS_SDK}" ]]; then
+            echo "SDK variable ${sdk_variable} is not available." >&2
+            exit 1
+          fi
+          echo "BOLOS_SDK=${BOLOS_SDK}" >> "${GITHUB_ENV}"
+          echo "BOLOS_SDK will be set to: ${BOLOS_SDK}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Checkout SDK
+        if: ${{ needs.call_get_app_metadata.outputs.is_rust == 'false' && inputs.sdk_reference != '' }}
+        working-directory: ${{ env.BOLOS_SDK }}
+        shell: bash
+        run: |
+          echo "Using BOLOS_SDK: ${BOLOS_SDK}"
+          echo "Checking out reference '${SDK_REFERENCE}'..."
+          if [[ ! "${SDK_REFERENCE}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SDK reference must be an immutable 40-character commit SHA." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin "${SDK_REFERENCE}"
+          git checkout --detach "${SDK_REFERENCE}"
+          DEVICE=${MATRIX_DEVICE}
+          echo "ADDITIONAL_ARGS=TARGET=${DEVICE/sp/s2}" >> "${GITHUB_ENV}"
+        env:
+          MATRIX_DEVICE: ${{ matrix.device }}
+
+      - name: Build application
+        id: "build"
+        working-directory: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+        shell: bash
+        run: |
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+              BUILD_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanosplus/')"
+              # Assemble everything passed to `cargo ledger build` after `--`.
+              # Features are literal names, so collect them in a quoted array to
+              # avoid glob expansion and keep argument boundaries explicit.
+              CARGO_FEATURE_ARGS=()
+              # Cargo features to enable (e.g. app variants such as `variant_*`).
+              read -r -a feature_names <<< "${FEATURES}"
+              for feature in "${feature_names[@]}"; do
+                if [[ ! "${feature}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                  echo "Invalid Cargo feature: ${feature}" >&2
+                  exit 1
+                fi
+                CARGO_FEATURE_ARGS+=(--features "${feature}")
+              done
+              # Stack consumption tracking is just another SDK feature.
+              if [ "${ENABLE_STACK_CONSUMPTION}" = "true" ]; then
+                CARGO_FEATURE_ARGS+=(--features ledger_device_sdk/stack_usage)
+              fi
+              echo "Feature args: ${CARGO_FEATURE_ARGS[*]}"
+              cargo ledger build "${BUILD_DEVICE_NAME}" -- --locked "${CARGO_FEATURE_ARGS[@]}"
+              binary_path=$(cargo metadata --no-deps --format-version 1 | jq -r '.target_directory')
+          else
+              echo "Using BOLOS_SDK: ${BOLOS_SDK}"
+              MAKE_ARGS=()
+              read -r -a manifest_make_args <<< "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_FLAGS}"
+              for arg in "${manifest_make_args[@]}"; do
+                if [[ ! "${arg}" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+$ ]]; then
+                  echo "Invalid Make argument from the application manifest: ${arg}" >&2
+                  exit 1
+                fi
+                MAKE_ARGS+=("${arg}")
+              done
+              if [ -n "${ADDITIONAL_ARGS}" ]; then
+                MAKE_ARGS+=("${ADDITIONAL_ARGS}")
+              fi
+              if [ "${ENABLE_STACK_CONSUMPTION}" = "true" ]; then
+                MAKE_ARGS+=("DEBUG_OS_STACK_CONSUMPTION=1")
+              fi
+              make -j "${MAKE_ARGS[@]}" BOLOS_SDK="${BOLOS_SDK}"
+              binary_path="${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build"
+          fi
+          if [ -z "${binary_path}" ]; then
+            echo "Build did not produce a binary path." >&2
+            exit 1
+          fi
+          echo "binary_path=${binary_path}" >> "${GITHUB_OUTPUT}"
+          echo "binary_path=${binary_path}"
+          echo "Build complete"
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          MATRIX_DEVICE: ${{ matrix.device }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_FLAGS: ${{ needs.call_get_app_metadata.outputs.flags }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+
+      - name: Remove build artifacts before upload
+        shell: bash
+        run: |
+          workspace=$(realpath -m -- "${GITHUB_WORKSPACE}")
+          binary_path=$(realpath -m -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH}")
+          case "${binary_path}" in
+            "${workspace}"/*) ;;
+            *)
+              echo "Build output must stay inside the checked-out workspace." >&2
+              exit 1
+              ;;
+          esac
+          relative_binary_path=${binary_path#"${workspace}/"}
+          case "${relative_binary_path}" in
+            .git|.git/*)
+              echo "Refusing to clean build output inside .git." >&2
+              exit 1
+              ;;
+          esac
+          if [ ! -d "${binary_path}" ]; then
+            echo "Build output directory does not exist: ${binary_path}" >&2
+            exit 1
+          fi
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+              find "${binary_path}" -mindepth 3 -maxdepth 3 -type d -exec rm -rf -- {} +
+              rm -rf -- "${binary_path}/release"
+          else
+              find "${binary_path}" -mindepth 2 -maxdepth 2 -type d ! -name 'bin' -exec rm -rf -- {} +
+          fi
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Prepare to upload as lib
+        if: ${{ inputs.upload_as_lib_artifact != '' }}
+        shell: bash
+        run: |
+          if [ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ];
+          then
+            C_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanos2/')"
+            RUST_DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/sp/splus/')"
+            ELF_NAME=$(cargo metadata --manifest-path "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/Cargo.toml" --no-deps --format-version 1 | jq -r '.packages[] | select(.metadata.ledger != null) | .name')
+            mv "${STEPS_BUILD_OUTPUTS_BINARY_PATH}/${RUST_DEVICE_NAME}/release/${ELF_NAME}" "${STEPS_BUILD_OUTPUTS_BINARY_PATH}/${UPLOAD_AS_LIB_ARTIFACT}_${C_DEVICE_NAME}.elf"
+            rm -rf -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH:?}/${RUST_DEVICE_NAME}"
+          else
+            DEVICE_NAME="$(echo "${MATRIX_DEVICE}" | sed 's/nanosp/nanos2/')"
+            find "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build/${DEVICE_NAME}/" -type f -name 'app.elf' -exec mv {} "${UPLOAD_AS_LIB_ARTIFACT}_${DEVICE_NAME}.elf" \;
+            build_output_dir="${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY:?}/build"
+            find "${build_output_dir}" -mindepth 1 -maxdepth 1 -exec rm -r -- {} +
+            mv "${UPLOAD_AS_LIB_ARTIFACT}_${DEVICE_NAME}.elf" "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY}/build/"
+          fi
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+          MATRIX_DEVICE: ${{ matrix.device }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_BUILD_DIRECTORY: ${{ needs.call_get_app_metadata.outputs.build_directory }}
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Display structure of binary files
+        run: |
+          ls -1 -- "${STEPS_BUILD_OUTPUTS_BINARY_PATH}"
+        env:
+          STEPS_BUILD_OUTPUTS_BINARY_PATH: ${{ steps.build.outputs.binary_path }}
+
+      - name: Upload app binary
+        if: ${{ inputs.upload_app_binaries_artifact != '' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}_target-${{ matrix.device }}
+          path: ${{ steps.build.outputs.binary_path }}
+          if-no-files-found: error
+
+  merge_artifacts_target_branch:
+    name: Merge build artifacts (target branch)
+    needs: build_target_branch
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.build_comparison && github.event_name == 'pull_request' && inputs.upload_app_binaries_artifact != '' }}
+    steps:
+      - uses: actions/upload-artifact/merge@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}_target
+          pattern: ${{ inputs.upload_app_binaries_artifact }}_target-*
+          delete-merged: true
+
+  diff_elf_sizes:
+    name: Report ELF section sizes
+    needs: [call_get_app_metadata, merge_artifacts, merge_artifacts_target_branch]
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite@sha256:02dfec4a79dd5ea1783c534f8e5f104a82a7492ba49d6dfe0360db8fc3b908b7
+    if: ${{ inputs.build_comparison && github.event_name == 'pull_request' && inputs.upload_app_binaries_artifact != '' }}
+
+    steps:
+      - name: Download source branch artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}
+          path: source_artifact/
+
+      - name: Download target branch artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.upload_app_binaries_artifact }}_target
+          path: target_artifact/
+
+      - name: Compute ELF section sizes
+        shell: bash
+        run: |
+          SRC="${GITHUB_HEAD_REF}"
+          TGT="${GITHUB_BASE_REF}"
+          echo "elf sizes" >> elf_diff.md
+
+          echo "source = source branch ${SRC}" >> elf_diff.md
+          echo "target = target branch ${TGT}" >> elf_diff.md
+
+          echo "| Device | .text source | .text target | .text delta | .bss source | .bss target | .bss delta | max stack size source | max stack size target | max stack size delta |" >> elf_diff.md
+          echo "|--------|---:|---:|---:|---:|---:|---:|---:|---:|---:|" >> elf_diff.md
+          mapfile -t devices < <(jq -r '.[]' <<< "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_COMPATIBLE_DEVICES}")
+          for device in "${devices[@]}"; do
+              case "${device}" in
+                nanos|nanox|nanosp|stax|flex|apex_m|apex_p) ;;
+                *)
+                  echo "Unsupported Ledger device in size report: ${device}" >&2
+                  exit 1
+                  ;;
+              esac
+
+              if [[ "${NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST}" = "true" ]]; then
+                DEVICE_NAME="$(echo "${device}" | sed 's/nanosp/nanosplus/')"
+                APP_PATH_SRC=$(find source_artifact/${DEVICE_NAME}/release -type f ! -name '*.*' | head -n 1)
+                APP_PATH_TARGET=$(find target_artifact/${DEVICE_NAME}/release -type f ! -name '*.*' | head -n 1)
+              else
+                DEVICE_NAME="$(echo "${device}" | sed 's/nanosp/nanos2/')"
+                APP_PATH_SRC=$(find source_artifact/${DEVICE_NAME}/bin -name '*.elf' | head -n 1)
+                APP_PATH_TARGET=$(find target_artifact/${DEVICE_NAME}/bin -name '*.elf' | head -n 1)
+              fi
+
+              src_text="$(size "${APP_PATH_SRC}" | awk 'END {print $1}')"
+              tgt_text="$(size "${APP_PATH_TARGET}" | awk 'END {print $1}')"
+
+              src_bss=$(nm ${APP_PATH_SRC} | grep -w '_bss' | awk '{print "0x"$1}')
+              src_ebss=$(nm ${APP_PATH_SRC} | grep -w '_ebss' | awk '{print "0x"$1}')
+              src_bss_size=$((src_ebss - src_bss))
+
+              tgt_bss=$(nm ${APP_PATH_TARGET} | grep -w '_bss' | awk '{print "0x"$1}')
+              tgt_ebss=$(nm ${APP_PATH_TARGET} | grep -w '_ebss' | awk '{print "0x"$1}')
+              tgt_bss_size=$((tgt_ebss - tgt_bss))
+
+              bss_delta=$((src_bss_size - tgt_bss_size))
+
+              if [[ "$DEVICE_NAME" == "nanox" ]]; then
+                src_stack_size=8192
+                tgt_stack_size=8192
+              else
+                src_stack=$(nm ${APP_PATH_SRC} | grep -w '_stack' | awk '{print "0x"$1}')
+                src_estack=$(nm ${APP_PATH_SRC} | grep -w '_estack' | awk '{print "0x"$1}')
+                src_stack_size=$((src_estack - src_stack))
+                tgt_stack=$(nm ${APP_PATH_TARGET} | grep -w '_stack' | awk '{print "0x"$1}')
+                tgt_estack=$(nm ${APP_PATH_TARGET} | grep -w '_estack' | awk '{print "0x"$1}')
+                tgt_stack_size=$((tgt_estack - tgt_stack))
+              fi
+
+              stack_delta=$((src_stack_size - tgt_stack_size))
+
+              echo "| ${DEVICE_NAME} | ${src_text} | ${tgt_text} | $((src_text - tgt_text)) | ${src_bss_size} | ${tgt_bss_size} | ${bss_delta} | ${src_stack_size} | ${tgt_stack_size} | ${stack_delta} |" >> elf_diff.md
+          done
+        env:
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_COMPATIBLE_DEVICES: ${{ needs.call_get_app_metadata.outputs.compatible_devices }}
+          NEEDS_CALL_GET_APP_METADATA_OUTPUTS_IS_RUST: ${{ needs.call_get_app_metadata.outputs.is_rust }}
+
+      - name: Publish ELF size report
+        shell: bash
+        run: cat elf_diff.md >> "${GITHUB_STEP_SUMMARY}"

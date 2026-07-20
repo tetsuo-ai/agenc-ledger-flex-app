@@ -1,0 +1,168 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# External dependencies are locally hardened to immutable revisions.
+---
+name: Open PR with new snapshots
+
+on:
+  workflow_call:
+    inputs:
+      app_repository:
+        description: 'The GIT repository to test (defaults to `github.repository`)'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      app_branch_name:
+        description: 'The immutable GIT commit containing the tested snapshots'
+        required: false
+        default: ${{ github.sha }}
+        type: string
+      base_branch_name:
+        description: 'The branch targeted by the generated pull request'
+        required: false
+        default: ${{ github.ref_name }}
+        type: string
+      snapshots_artifact_name:
+        description: 'The artifact name'
+        required: true
+        type: string
+      snapshots_directory:
+        description: 'The directory in which the snapshots are extracted'
+        required: true
+        type: string
+      also_delete_snapshots:
+        description: |
+          When true, wipe the existing snapshots directory before extracting the freshly
+          generated snapshots.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  APP_REPOSITORY: ${{ inputs.app_repository }}
+  APP_BRANCH_NAME: ${{ inputs.app_branch_name }}
+  BASE_BRANCH_NAME: ${{ inputs.base_branch_name }}
+  SNAPSHOTS_ARTIFACT_NAME: ${{ inputs.snapshots_artifact_name }}
+  SNAPSHOTS_DIRECTORY: ${{ inputs.snapshots_directory }}
+
+jobs:
+  commit_new_snapshots:
+    name: Commit new snapshots
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # Required to push the generated snapshot branch.
+      pull-requests: write  # Required to create the reviewed snapshot pull request.
+    steps:
+      - name: Refuse to run on anything else than workflow dispatch
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        # Running this job on PRs or push could get out of hand
+        run: |
+          echo "This workflow is only allowed to run on 'workflow_dispatch' events."
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.app_repository }}
+          ref: ${{ inputs.app_branch_name }}
+          submodules: recursive
+          # by default the action uses fetch-depth = 1, which creates
+          # shallow repositories from which we can't push
+          fetch-depth: 0
+          # needed, else the push inside the action will use default credentials
+          # instead of provided ones
+          persist-credentials: false
+
+      - name: Validate snapshot update scope
+        id: validate-scope
+        shell: bash
+        run: |
+          if [[ "${APP_REPOSITORY}" != "${GITHUB_REPOSITORY}" ]]; then
+            echo "Snapshot updates may only target this repository." >&2
+            exit 1
+          fi
+          if [[ ! "${APP_BRANCH_NAME}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Snapshot source must be an immutable commit SHA." >&2
+            exit 1
+          fi
+          if [[ ! "${BASE_BRANCH_NAME}" =~ ^[A-Za-z0-9._/-]+$ || "${BASE_BRANCH_NAME}" == *..* ]]; then
+            echo "Invalid snapshot pull-request base branch." >&2
+            exit 1
+          fi
+          repo_root="$(git rev-parse --show-toplevel)"
+          snapshot_path="$(realpath -m -- "${SNAPSHOTS_DIRECTORY}")"
+          case "${snapshot_path}" in
+            "${repo_root}"/*) ;;
+            *)
+              echo "Snapshot directory must stay inside the repository." >&2
+              exit 1
+              ;;
+          esac
+          relative_path="${snapshot_path#"${repo_root}/"}"
+          if [[ "${relative_path}" == .git || "${relative_path}" == .git/* ]]; then
+            echo "Snapshot directory may not modify Git metadata." >&2
+            exit 1
+          fi
+          echo "path=${relative_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Clear existing snapshots
+        if: ${{ inputs.also_delete_snapshots == true }}
+        env:
+          VALIDATED_SNAPSHOTS_DIRECTORY: ${{ steps.validate-scope.outputs.path }}
+        run: rm -rf -- "${VALIDATED_SNAPSHOTS_DIRECTORY:?}"
+
+      - name: Download new snapshots
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.snapshots_artifact_name }}
+          path: ${{ steps.validate-scope.outputs.path }}
+
+      - name: Check if update is needed
+        id: check-changes
+        run: |
+          git status
+          if [ -n "$(git status --porcelain)" ]; then
+              echo "Changes detected"
+              echo "changes_detected=true" >> "${GITHUB_OUTPUT}"
+          else
+              echo "No changes detected"
+              echo "changes_detected=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Commit changes, create branch and open a PR
+        if: ${{ steps.check-changes.outputs.changes_detected == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATED_SNAPSHOTS_DIRECTORY: ${{ steps.validate-scope.outputs.path }}
+        run: |
+          # Set credentials for commit creation
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${VALIDATED_SNAPSHOTS_DIRECTORY}"
+          git status
+          git commit -m "[auto-update] Update Ragger snapshots"
+
+          # Use the commit sha in the branch name to allow this job to be parallelized
+          id=$(git rev-parse --short HEAD)
+          echo "ID: $id"
+          branch_name="auto/update_snapshots-$id"
+          echo "Branch Name: ${branch_name}"
+          git checkout -b "${branch_name}"
+          gh auth setup-git
+          git push -u origin "${branch_name}"
+
+          # Create 'auto' label if missing
+          if [ -z "$(gh label list --search auto)" ]; then
+            gh label create 'auto' --color 'b4a8d1' --description 'Automatically created'
+          fi
+
+          body="PR created by a Github workflow\n\n:warning: You <ins>need</ins> to review the generated snapshots :warning:"
+          # Create the PR with a placeholder body. Will be consolidated at a later step
+          gh pr create \
+            --base "${BASE_BRANCH_NAME}" \
+            --head "$branch_name" \
+            --label "auto" \
+            --title "[auto-update] Update Ragger snapshots" \
+            --body "$(echo -e "$body")"

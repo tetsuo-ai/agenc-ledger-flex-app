@@ -1,0 +1,38 @@
+# Vendored from LedgerHQ/ledger-app-workflows@adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a (v1.106.0).
+# The vendored graph always checks out Ledger helper scripts from that immutable revision.
+name: Resolve vendored Ledger workflow version
+
+on:
+  workflow_call:
+    inputs:
+      repository_name:
+        description: Retained for compatibility with the upstream reusable workflow
+        required: true
+        type: string
+      file_name:
+        description: Retained for compatibility with the upstream reusable workflow
+        required: true
+        type: string
+    secrets:
+      git_token:
+        description: Retained for compatibility; no token is consumed by this local resolver
+        required: false
+    outputs:
+      version:
+        description: Immutable upstream Ledger workflow revision
+        value: ${{ jobs.get-version.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  get-version:
+    name: Resolve vendored workflow version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.workflow-version.outputs.version }}
+    steps:
+      - name: Export immutable upstream revision
+        id: workflow-version
+        shell: bash
+        run: echo "version=adb54f0c6a2fa93a7f14764f92ad4d09cc4f192a" >> "${GITHUB_OUTPUT}"

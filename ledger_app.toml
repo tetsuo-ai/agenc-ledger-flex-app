@@ -15,7 +15,6 @@ directory = "./tests/python/"
 directory = "./tests/swap/"
 [pytest.swap.dependencies]
 testing_with_latest = [
-    {url = "https://github.com/LedgerHQ/app-exchange", ref = "develop", use_case = "dbg_use_test_keys"},
-    {url = "https://github.com/LedgerHQ/app-ethereum", ref = "develop", use_case = "use_test_keys"},
+    {url = "https://github.com/LedgerHQ/app-exchange", ref = "47ee76b1bc5e89286dd2583fefb0dd08e6d742af", use_case = "dbg_use_test_keys"},
+    {url = "https://github.com/LedgerHQ/app-ethereum", ref = "07e8f9e5e1ff69046557ff586af33891120eb66c", use_case = "use_test_keys"},
 ]
-

@@ -479,7 +479,7 @@ int validate_instruction_using_descriptor(const MessageHeader *header,
                                           const Instruction *instruction) {
     // Retrieve / calculate the swap validated mint address and recipient address
     // With the current architecture we actually do this step at each instruction but the impact is
-    // negligeable
+    // negligible
     bool is_token_2022_kind;
     const uint8_t *validated_mint_address = get_token_mint_address(get_swap_ticker(),
                                                                    &is_token_2022_kind);

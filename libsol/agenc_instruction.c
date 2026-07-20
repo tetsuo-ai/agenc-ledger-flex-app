@@ -5,15 +5,15 @@
 
 #include <string.h>
 
-#define AGENC_DISCRIMINATOR_SIZE 8
-#define AGENC_HASH_SIZE          32
-#define AGENC_DESCRIPTION_SIZE   64
-#define AGENC_RESULT_DATA_SIZE   64
+#define AGENC_DISCRIMINATOR_SIZE          8
+#define AGENC_HASH_SIZE                   32
+#define AGENC_DESCRIPTION_SIZE            64
+#define AGENC_RESULT_DATA_SIZE            64
 #define AGENC_ARTIFACT_RESULT_PREFIX      "artifact:sha256:"
 #define AGENC_ARTIFACT_RESULT_PREFIX_SIZE 16
 #define AGENC_ARTIFACT_RESULT_B64_SIZE    43
 
-#define AGENC_REGISTER_AGENT_ACCOUNTS             4
+#define AGENC_REGISTER_AGENT_ACCOUNTS            4
 #define AGENC_CREATE_TASK_ACCOUNTS               13
 #define AGENC_CONFIGURE_TASK_VALIDATION_ACCOUNTS 7
 #define AGENC_SET_TASK_JOB_SPEC_ACCOUNTS         9
@@ -28,26 +28,26 @@
 const Pubkey agenc_artifact_program_id = {{PROGRAM_ID_AGENC_ARTIFACT}};
 const Pubkey agenc_mainnet_preset_program_id = {{PROGRAM_ID_AGENC_MAINNET_PRESET}};
 
-static const uint8_t DISCRIMINATOR_REGISTER_AGENT[AGENC_DISCRIMINATOR_SIZE] = {
-    0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e};
-static const uint8_t DISCRIMINATOR_CREATE_TASK[AGENC_DISCRIMINATOR_SIZE] = {
-    0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab};
-static const uint8_t DISCRIMINATOR_CONFIGURE_TASK_VALIDATION[AGENC_DISCRIMINATOR_SIZE] = {
-    0x0b, 0x4f, 0x13, 0xbc, 0x0d, 0x20, 0xf4, 0x5a};
-static const uint8_t DISCRIMINATOR_SET_TASK_JOB_SPEC[AGENC_DISCRIMINATOR_SIZE] = {
-    0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1};
-static const uint8_t DISCRIMINATOR_CLAIM_TASK_WITH_JOB_SPEC[AGENC_DISCRIMINATOR_SIZE] = {
-    0xe6, 0x28, 0x6b, 0x6d, 0xd0, 0xe4, 0xaf, 0x1f};
-static const uint8_t DISCRIMINATOR_SUBMIT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] = {
-    0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07};
-static const uint8_t DISCRIMINATOR_ACCEPT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] = {
-    0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
-static const uint8_t DISCRIMINATOR_REJECT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] = {
-    0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6};
-static const uint8_t DISCRIMINATOR_CANCEL_TASK[AGENC_DISCRIMINATOR_SIZE] = {
-    0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
-static const uint8_t DISCRIMINATOR_EXPIRE_CLAIM[AGENC_DISCRIMINATOR_SIZE] = {
-    0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
+static const uint8_t DISCRIMINATOR_REGISTER_AGENT[AGENC_DISCRIMINATOR_SIZE] =
+    {0x87, 0x9d, 0x42, 0xc3, 0x02, 0x71, 0xaf, 0x1e};
+static const uint8_t DISCRIMINATOR_CREATE_TASK[AGENC_DISCRIMINATOR_SIZE] =
+    {0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab};
+static const uint8_t DISCRIMINATOR_CONFIGURE_TASK_VALIDATION[AGENC_DISCRIMINATOR_SIZE] =
+    {0x0b, 0x4f, 0x13, 0xbc, 0x0d, 0x20, 0xf4, 0x5a};
+static const uint8_t DISCRIMINATOR_SET_TASK_JOB_SPEC[AGENC_DISCRIMINATOR_SIZE] =
+    {0x86, 0x66, 0x66, 0x56, 0x1f, 0xa4, 0xca, 0xc1};
+static const uint8_t DISCRIMINATOR_CLAIM_TASK_WITH_JOB_SPEC[AGENC_DISCRIMINATOR_SIZE] =
+    {0xe6, 0x28, 0x6b, 0x6d, 0xd0, 0xe4, 0xaf, 0x1f};
+static const uint8_t DISCRIMINATOR_SUBMIT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] =
+    {0x27, 0x6c, 0x4a, 0x04, 0x42, 0x7d, 0x9d, 0x07};
+static const uint8_t DISCRIMINATOR_ACCEPT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] =
+    {0x59, 0xe6, 0x33, 0x19, 0x00, 0xdb, 0x05, 0x89};
+static const uint8_t DISCRIMINATOR_REJECT_TASK_RESULT[AGENC_DISCRIMINATOR_SIZE] =
+    {0x90, 0x07, 0x3a, 0xe8, 0x9d, 0xa7, 0x55, 0xd6};
+static const uint8_t DISCRIMINATOR_CANCEL_TASK[AGENC_DISCRIMINATOR_SIZE] =
+    {0x45, 0xe4, 0x86, 0xbb, 0x86, 0x69, 0xee, 0x30};
+static const uint8_t DISCRIMINATOR_EXPIRE_CLAIM[AGENC_DISCRIMINATOR_SIZE] =
+    {0xb0, 0x4e, 0xf1, 0x1d, 0x9f, 0x51, 0x1a, 0x06};
 
 bool is_agenc_program_id(const Pubkey *program_id) {
     if (pubkeys_equal(program_id, &agenc_artifact_program_id)) {
@@ -139,9 +139,7 @@ static int base64url_value(uint8_t character) {
 }
 
 static bool decode_artifact_result_hash(const uint8_t *result_data, Hash *artifact_hash) {
-    if (memcmp(result_data,
-               AGENC_ARTIFACT_RESULT_PREFIX,
-               AGENC_ARTIFACT_RESULT_PREFIX_SIZE) != 0) {
+    if (memcmp(result_data, AGENC_ARTIFACT_RESULT_PREFIX, AGENC_ARTIFACT_RESULT_PREFIX_SIZE) != 0) {
         return false;
     }
 
@@ -188,9 +186,7 @@ static int parse_borsh_string(Parser *parser, SizedString *string) {
     return 0;
 }
 
-static int parse_optional_borsh_string(Parser *parser,
-                                       SizedString *string,
-                                       bool *has_string) {
+static int parse_optional_borsh_string(Parser *parser, SizedString *string, bool *has_string) {
     enum Option option;
     BAIL_IF(parse_option(parser, &option));
     if (option == OptionNone) {
@@ -351,7 +347,8 @@ static int parse_submit_task_result(Parser *parser,
     BAIL_IF(parse_hash_ref(parser, &info->proof_hash));
     BAIL_IF(parse_optional_result_data(parser, &info->result_data, &info->has_result_data));
     if (info->has_result_data) {
-        info->has_artifact_hash = decode_artifact_result_hash(info->result_data, &info->artifact_hash);
+        info->has_artifact_hash = decode_artifact_result_hash(info->result_data,
+                                                              &info->artifact_hash);
     }
     return 0;
 }
@@ -419,9 +416,8 @@ static int parse_cancel_task(const Instruction *instruction,
     BAIL_IF(account_at(instruction, header, 3, &info->protocol_config));
     BAIL_IF(account_at(instruction, header, 4, &info->system_program));
     BAIL_IF(validate_system_program(info->system_program));
-    info->worker_account_count =
-        (instruction->accounts_length - AGENC_CANCEL_TASK_BASE_ACCOUNTS) /
-        AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE;
+    info->worker_account_count = (instruction->accounts_length - AGENC_CANCEL_TASK_BASE_ACCOUNTS) /
+                                 AGENC_CANCEL_TASK_WORKER_ACCOUNT_STRIDE;
     return 0;
 }
 
@@ -485,9 +481,8 @@ int parse_agenc_instructions(const Instruction *instruction,
                       DISCRIMINATOR_CLAIM_TASK_WITH_JOB_SPEC,
                       AGENC_DISCRIMINATOR_SIZE) == 0) {
         info->kind = AgencInstructionClaimTaskWithJobSpec;
-        BAIL_IF(parse_claim_task_with_job_spec(instruction,
-                                               header,
-                                               &info->claim_task_with_job_spec));
+        BAIL_IF(
+            parse_claim_task_with_job_spec(instruction, header, &info->claim_task_with_job_spec));
     } else if (memcmp(discriminator, DISCRIMINATOR_SUBMIT_TASK_RESULT, AGENC_DISCRIMINATOR_SIZE) ==
                0) {
         info->kind = AgencInstructionSubmitTaskResult;
@@ -642,8 +637,7 @@ int print_agenc_create_task_with_review_info(const AgencInfo *create_info,
     BAIL_IF(configure_info->kind != AgencInstructionConfigureTaskValidation);
 
     const AgencCreateTaskInfo *create_task = &create_info->create_task;
-    const AgencConfigureTaskValidationInfo *configure =
-        &configure_info->configure_task_validation;
+    const AgencConfigureTaskValidationInfo *configure = &configure_info->configure_task_validation;
 
     BAIL_IF(!pubkeys_equal(create_task->task, configure->task));
     BAIL_IF(!pubkeys_equal(create_task->creator, configure->creator));
