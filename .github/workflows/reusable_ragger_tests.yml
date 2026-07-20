@@ -408,21 +408,21 @@ jobs:
 
       - name: Upload stack consumption summary
         if: ${{ always() && hashFiles(format('stack_summary_{0}.txt', matrix.device)) != '' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.stack_consumption_section_id }}-${{ matrix.device }}
           path: stack_summary_${{ matrix.device }}.txt
 
       - name: Upload pytest logs
         if: ${{ inputs.capture_file != '' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pytest-logs-${{ matrix.device }}
           path: pytest_output.log
 
       - name: Upload coverage report
         if: ${{ inputs.coverage && hashFiles(format('coverage-{0}.info', matrix.device)) != '' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ matrix.device }}
           path: |
@@ -470,7 +470,7 @@ jobs:
 
       - name: Upload snapshots if needed
         if: ${{ steps.upload-flag.outputs.artifact_uploaded == 'true' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Make the artifact name unique to allow running this job in parallel
           # Append a ~ at the end to prevent one job's pattern from prefixing another one
@@ -499,7 +499,7 @@ jobs:
           find logs -name "pytest_output.log" -exec cat {} \; > "${CAPTURE_FILE}.log"
 
       - name: Upload combined logs
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: "${{ inputs.capture_file }}"
           path: "${{ inputs.capture_file }}.log"
