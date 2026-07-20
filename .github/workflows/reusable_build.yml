@@ -319,7 +319,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ inputs.upload_app_binaries_artifact != '' }}
     steps:
-      - uses: actions/upload-artifact/merge@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact/merge@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.upload_app_binaries_artifact }}
           pattern: ${{ inputs.upload_app_binaries_artifact }}-*
@@ -528,7 +528,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ inputs.build_comparison && github.event_name == 'pull_request' && inputs.upload_app_binaries_artifact != '' }}
     steps:
-      - uses: actions/upload-artifact/merge@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact/merge@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.upload_app_binaries_artifact }}_target
           pattern: ${{ inputs.upload_app_binaries_artifact }}_target-*
